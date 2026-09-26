@@ -1,0 +1,50 @@
+name: 성취수준 PDF 변환
+
+# pdfs/ 폴더에 PDF를 올리면 자동으로 data/standards/*.js 로 변환해 커밋합니다.
+on:
+  push:
+    paths:
+      - 'pdfs/**.pdf'
+      - 'pdfs/**.PDF'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  convert:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: pip install pdfplumber
+
+      - name: 바뀐 PDF 변환 (수동 실행 시 전체)
+        run: |
+          BEFORE="${{ github.event.before }}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ -z "$BEFORE" ] || ! git cat-file -e "$BEFORE" 2>/dev/null; then
+            find pdfs -iname '*.pdf' -print0 > files.lst
+          else
+            git diff --name-only -z --diff-filter=AM "$BEFORE" HEAD -- 'pdfs/' | grep -zi '\.pdf$' > files.lst || true
+          fi
+          if [ ! -s files.lst ]; then echo "변환할 PDF가 없습니다."; exit 0; fi
+          xargs -0 python tools/pdf_to_standards.py < files.lst | tee convert-log.txt
+          echo '## 변환 결과' >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          cat convert-log.txt >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 결과 커밋
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/standards
+          if git diff --cached --quiet; then echo "변경 없음"; exit 0; fi
+          git commit -m "성취기준 데이터 자동 변환"
+          git push
