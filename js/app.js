@@ -508,7 +508,7 @@ const actions = {
     loadStandards('공통국어1');
   },
   saveFile: () => { downloadBlob(new Blob([JSON.stringify(state, null, 1)], { type: 'application/json' }), fileBase() + '.json'); return false; },
-  exportDocx: () => { exportDocx(); return false; },
+  exportHwpx: () => { exportHwpx(); return false; },
   print: () => { window.print(); return false; },
 };
 function move(arr, i, dir) {
@@ -631,10 +631,16 @@ function cleanDocHTML() {
   return c.innerHTML;
 }
 
-function exportDocx() {
+function exportHwpx() {
   const root = document.createElement('div');
   root.innerHTML = cleanDocHTML();
-  downloadBlob(DOCX.build(root), fileBase() + '.docx');
+  setStatus('한글 파일 만드는 중…');
+  HWPX.ensureTemplate()
+    .then(() => {
+      downloadBlob(HWPX.build(root, fileBase()), fileBase() + '.hwpx');
+      setStatus('한글 파일을 내려받았습니다');
+    })
+    .catch(err => alert('한글 파일을 만들지 못했습니다.\n' + err.message));
 }
 
 /* ---------- 시작 ---------- */
