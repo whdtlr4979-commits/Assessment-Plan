@@ -1,7 +1,8 @@
 # 교수학습 및 평가 운영 계획 작성기
 
 「과목별 교수학습 및 평가 운영 계획」 양식(2026학년도 2학기)을 웹 화면에 그대로 옮겨 놓은 작성 도구입니다.
-화면에서 양식 칸을 바로 클릭해 채우고, **한글·워드(.docx)** 로 내려받거나 **인쇄/PDF** 로 저장할 수 있습니다.
+화면에서 양식 칸을 바로 클릭해 채우고, **한글 문서(.hwpx)** 로 내려받거나 **인쇄/PDF** 로 저장할 수 있습니다.
+내려받은 한글 문서는 양식 파일의 글꼴·테두리·제목 모양을 그대로 씁니다.
 
 ## 주요 기능
 
@@ -94,10 +95,12 @@ css/style.css              양식 모양(A4) 및 인쇄 설정
 js/defaults.js             양식 기본 문구, 주차, 성취율 표
 js/example.js              양식 〈예시〉(공통국어1) 데이터
 js/app.js                  입력·자동계산·저장
-js/docx.js                 .docx 내보내기 (외부 라이브러리 없음)
+js/hwpx.js                 한글(.hwpx) 내보내기 (외부 라이브러리 없음)
+js/hwpx-template.js        양식 한글 파일에서 뽑은 스타일 (tools/make_hwpx_template.py 로 생성)
 data/standards/            과목별 성취기준·성취수준 데이터
 tools/pdf_to_standards.py  성취수준 PDF → 데이터 변환 도구
 tools/subject_names.json   과목명 직접 지정(코드 앞부분 → 과목명)
+tools/make_hwpx_template.py  양식 한글 파일 → js/hwpx-template.js
 pdfs/                      변환할 PDF를 올리는 폴더
 .github/workflows/         PDF 자동 변환 설정
 ```
