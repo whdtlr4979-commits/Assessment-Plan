@@ -4,27 +4,30 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>교수학습 및 평가 운영 계획 작성기</title>
+  <link rel="icon" href="data:,">
   <!-- 파일을 고치면 아래 버전(v=)을 올려 주세요: 브라우저가 예전 파일을 쓰지 않도록 함 -->
-  <script>window.APP_VERSION = '20260926b';</script>
-  <link rel="stylesheet" href="css/style.css?v=20260926b">
+  <script>window.APP_VERSION = '20260927a';</script>
+  <link rel="stylesheet" href="css/style.css?v=20260927a">
 </head>
 <body>
-  <header class="toolbar">
+  <header class="topbar">
     <div class="brand">교수학습·평가 계획 작성기</div>
-    <div class="tools">
-      <button type="button" data-act="newPlan">새로 만들기</button>
-      <button type="button" data-act="loadExample">예시 불러오기</button>
-      <span class="sep"></span>
-      <button type="button" data-act="saveFile" title="작성 중인 내용을 파일로 저장합니다. 동료 교사와 공유하거나 나중에 이어서 작성할 때 사용하세요.">파일로 저장</button>
-      <label class="as-button" title="[파일로 저장]한 .json 파일을 불러옵니다">파일 열기<input type="file" id="planFile" accept=".json" hidden></label>
-      <span class="sep"></span>
-      <button type="button" class="primary" data-act="exportHwpx" title="양식과 같은 스타일의 한글 문서(.hwpx)로 내려받습니다">한글(.hwpx) 다운로드</button>
-      <button type="button" data-act="print">인쇄 / PDF</button>
-    </div>
     <div id="status" class="status"></div>
+    <div class="top-actions">
+      <button type="button" class="btn ghost" data-act="newPlan">새로 만들기</button>
+      <button type="button" class="btn ghost" data-act="loadExample">예시 보기</button>
+      <label class="btn ghost" title="[작성 파일 저장]으로 저장한 .json 파일을 불러옵니다">파일 열기<input type="file" id="planFile" accept=".json" hidden></label>
+      <button type="button" class="btn ghost" data-act="saveFile" title="작성 중인 내용을 파일로 저장합니다. 동료 교사와 공유하거나 다른 컴퓨터에서 이어서 작성할 때 쓰세요.">파일로 저장</button>
+      <button type="button" class="btn primary" data-act="exportHwpx">한글 다운로드</button>
+    </div>
   </header>
+  <nav id="stepNav" class="step-nav" aria-label="작성 단계"></nav>
 
-  <main id="doc" class="doc"></main>
+  <main class="app">
+    <div id="stepPanel" class="step-panel"></div>
+    <div id="doc" class="doc" hidden></div>
+    <div id="stepFoot" class="step-foot"></div>
+  </main>
 
   <dialog id="picker">
     <h2>성취기준 선택</h2>
@@ -44,10 +47,11 @@
     </div>
   </dialog>
 
-  <script src="js/defaults.js?v=20260926b"></script>
-  <script src="js/example.js?v=20260926b"></script>
-  <script src="data/standards/index.js?v=20260926b"></script>
-  <script src="js/hwpx.js?v=20260926b"></script>
-  <script src="js/app.js?v=20260926b"></script>
+  <script src="js/defaults.js?v=20260927a"></script>
+  <script src="js/example.js?v=20260927a"></script>
+  <script src="data/standards/index.js?v=20260927a"></script>
+  <script src="js/hwpx.js?v=20260927a"></script>
+  <script src="js/steps.js?v=20260927a"></script>
+  <script src="js/app.js?v=20260927a"></script>
 </body>
 </html>

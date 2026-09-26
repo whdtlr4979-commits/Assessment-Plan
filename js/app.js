@@ -58,6 +58,10 @@ function migrate(s) {
   out.tie = Object.assign(blankState().tie, s.tie || {});
   out.rateTables = Object.assign(blankState().rateTables, s.rateTables || {});
   out.perfs = (out.perfs || []).map(p => Object.assign(newPerf(), p, { rubric: Object.assign(newRubric(), p.rubric || {}) }));
+  if (!s.subjectType) {
+    const rt = out.rateTables;
+    out.subjectType = rt.common ? '공통과목' : rt.elective ? '선택과목' : rt.sciLab ? '과학탐구실험' : rt.artsPe ? '체육·예술' : '공통과목';
+  }
   return out;
 }
 let saveTimer = null;
@@ -76,12 +80,40 @@ function saveSoon() {
 function setStatus(t) { const el = $('#status'); if (el) el.textContent = t; }
 
 /* ---------- 렌더링 ---------- */
+const STEP_KEY = 'assessPlan.step';
+let step = (() => { try { return Math.max(0, Math.min(7, +localStorage.getItem(STEP_KEY) || 0)); } catch (e) { return 0; } })();
+
+/* 단계 화면 그리기 */
 function render() {
-  const doc = $('#doc');
   const scroll = window.scrollY;
+  $('#stepNav').innerHTML = STEPS.map((s, i) => `
+    <button type="button" class="step-tab${i === step ? ' on' : ''}${s.done() ? ' done' : ''}" data-act="goStep" data-step="${i}">
+      <span class="step-no">${s.done() && i !== step ? '✔' : i + 1}</span><span class="step-title">${s.title}</span></button>`).join('');
+  $('#stepPanel').innerHTML = `<div class="step-heading"><span class="step-count">${step + 1} / ${STEPS.length}</span><h2>${STEPS[step].title}</h2></div>`
+    + STEPS[step].render();
+  $('#stepFoot').innerHTML = `
+    ${step > 0 ? `<button type="button" class="btn secondary" data-act="goStep" data-step="${step - 1}">← ${STEPS[step - 1].title}</button>` : '<span></span>'}
+    ${step < STEPS.length - 1 ? `<button type="button" class="btn primary" data-act="goStep" data-step="${step + 1}">${STEPS[step + 1].title} →</button>` : ''}`;
+  const onFinish = STEPS[step].id === 'finish';
+  $('#doc').hidden = !onFinish;
+  if (onFinish) renderDoc();
+  updateCalcs();
+  $$('#stepPanel textarea').forEach(autoGrow);
+  window.scrollTo(0, scroll);
+}
+
+/* 양식 모양 문서 (미리보기·한글 내려받기·인쇄용, 읽기 전용) */
+function renderDoc() {
+  const doc = $('#doc');
   doc.innerHTML = [renderHeader(), renderPlan(), renderStandards(), renderDetail()].join('');
   updateCalcs();
-  window.scrollTo(0, scroll);
+  doc.querySelectorAll('.no-export, .btn-mini').forEach(e => e.remove());
+  doc.querySelectorAll('[contenteditable]').forEach(e => e.removeAttribute('contenteditable'));
+  doc.querySelectorAll('input, select').forEach(e => { e.disabled = true; });
+}
+function autoGrow(el) {
+  el.style.height = 'auto';
+  el.style.height = (el.scrollHeight + 2) + 'px';
 }
 
 function renderHeader() {
@@ -370,6 +402,11 @@ function calc(key) {
     case 'tiePerf': { const p = state.perfs[+a]; return `*[수행] ${p.name || ''} (${isNaN(num(p.ratio)) ? '' : num(p.ratio).toFixed(2)}%)`; }
     case 'rubTitle': { const p = state.perfs[+a]; return `${p.name || '(수행평가 영역명)'}(총 ${isNaN(num(p.max)) ? '  ' : fmt(num(p.max))}점)`; }
     case 'elMax': return fmt(elMax(state.perfs[+a].rubric.elements[+b]));
+    case 'elMaxLabel': return `최고 ${fmt(elMax(state.perfs[+a].rubric.elements[+b]))}점`;
+    case 'ratioText': {
+      const t = ratioTotal();
+      return t === 100 ? `✔ 합계 ${fmt(t)}%` : `합계 ${fmt(t)}% — ${t < 100 ? `${fmt(100 - t)}% 부족` : `${fmt(t - 100)}% 초과`}`;
+    }
     case 'rubCheck': {
       const p = state.perfs[+a];
       const total = sum(p.rubric.elements.map(elMax));
@@ -380,12 +417,24 @@ function calc(key) {
   }
   return '';
 }
+function ratioMeterHTML() {
+  const seg = (label, v, cls) => isNaN(v) || v <= 0 ? '' :
+    `<div class="meter-seg ${cls}" style="flex-basis:${Math.min(v, 100)}%" title="${esc(label)} ${fmt(v)}%"><span>${esc(label)} ${fmt(v)}%</span></div>`;
+  const t = ratioTotal();
+  return state.exams.map(e => seg(e.name || '정기시험', num(e.ratio), 'exam')).join('')
+    + state.perfs.map((p, i) => seg(p.name || `수행평가 ${i + 1}`, num(p.ratio), 'perf')).join('')
+    + (t < 100 ? `<div class="meter-seg rest" style="flex-basis:${100 - t}%"></div>` : '');
+}
 function updateCalcs() {
   $$('[data-calc]').forEach(el => {
     const v = calc(el.dataset.calc);
     if (el.textContent !== v) el.textContent = v;
-    if (el.classList.contains('check')) el.classList.toggle('warn', v.startsWith('⚠'));
+    if (el.classList.contains('check') || el.classList.contains('check-line') || el.classList.contains('meter-text')) {
+      el.classList.toggle('warn', v.startsWith('⚠') || v.startsWith('합계'));
+      el.classList.toggle('ok', v.startsWith('✔'));
+    }
   });
+  $$('[data-calc-html="ratioMeter"]').forEach(el => { el.innerHTML = ratioMeterHTML(); });
 }
 
 /* ---------- 입력 처리 ---------- */
@@ -404,14 +453,33 @@ document.addEventListener('input', e => {
   const path = el.dataset.bind;
   const v = readValue(el);
   setPath(path, v);
+  afterChange(path);
   // 같은 값을 보여주는 다른 칸 동기화 (예: 과목명)
-  $$(`[data-bind="${CSS.escape(path)}"]`).forEach(o => { if (o !== el && o.isContentEditable && o.innerText !== v) o.textContent = v; });
-  if (el.dataset.rerender) render(); else updateCalcs();
+  $$(`[data-bind="${CSS.escape(path)}"]`).forEach(o => {
+    if (o === el) return;
+    if (o.isContentEditable && o.innerText !== v) o.textContent = v;
+    else if ('value' in o && o.type !== 'checkbox' && o.type !== 'radio' && o.value !== v) o.value = v;
+  });
+  if (el.tagName === 'TEXTAREA') autoGrow(el);
+  if (el.dataset.rerender || el.type === 'checkbox') render(); else updateCalcs();
   saveSoon();
 });
+/* 한 값이 바뀌면 함께 바뀌어야 하는 값 */
+function afterChange(path) {
+  if (path === 'meta.semester') state.meta.term = `${state.meta.semester}학기`;
+  if (path === 'subjectType') {
+    Object.keys(state.rateTables).forEach(k => { state.rateTables[k] = false; });
+    state.rateTables[TYPE_RATE[state.subjectType] || 'common'] = true;
+  }
+}
 document.addEventListener('change', e => {
   const el = e.target;
-  if (el.type === 'radio' && el.dataset.bind) { setPath(el.dataset.bind, el.value); saveSoon(); }
+  if (el.type === 'radio' && el.dataset.bind) {
+    setPath(el.dataset.bind, el.value);
+    afterChange(el.dataset.bind);
+    if (el.dataset.rerender) render();
+    saveSoon();
+  }
   if (el.dataset.arr) {
     const arr = getPath(el.dataset.arr);
     const i = arr.indexOf(el.value);
@@ -434,6 +502,49 @@ document.addEventListener('paste', e => {
 /* ---------- 버튼 동작 ---------- */
 const actions = {
   toggle: d => { state[d.key] = !state[d.key]; },
+  goStep: d => {
+    step = Math.max(0, Math.min(STEPS.length - 1, +d.step));
+    try { localStorage.setItem(STEP_KEY, step); } catch (e) { /* 저장 못 해도 동작에는 지장 없음 */ }
+    window.scrollTo(0, 0);
+  },
+  pickSubject: () => {
+    const name = $('#subjectSearch').value.trim();
+    const entry = (window.STANDARDS_INDEX || []).find(s => s.subject === name)
+      || (window.STANDARDS_INDEX || []).find(s => s.subject.replace(/\s/g, '') === name.replace(/\s/g, ''));
+    if (!entry) { alert(name ? `‘${name}’ 과목을 찾지 못했습니다. 목록에서 골라 주세요.` : '과목명을 입력하세요.'); return false; }
+    if (state.areas.length && state.standardsSource !== entry.id && !confirm(`성취기준을 ‘${entry.subject}’(으)로 바꿀까요?`)) return false;
+    state.meta.subject = entry.subject;
+    if (/공통|통합|과학탐구실험|한국사/.test(entry.subject)) state.subjectType = /과학탐구실험/.test(entry.subject) ? '과학탐구실험' : '공통과목';
+    else if (/체육|스포츠|음악|미술|연극|영화|예술|운동|육상|체조|수상|드로잉|합창|시창/.test(entry.subject + entry.group)) state.subjectType = '체육·예술';
+    else state.subjectType = '선택과목';
+    afterChange('subjectType');
+    loadStandards(entry.id);
+  },
+  toggleStd: d => {
+    const codes = extractCodes(getPath(d.target));
+    const i = codes.indexOf(d.code);
+    if (i >= 0) codes.splice(i, 1); else codes.push(d.code);
+    const order = allStandards().map(s => s.code);
+    codes.sort((a, b2) => order.indexOf(a) - order.indexOf(b2));
+    setPath(d.target, codes.map(c => `[${c}]`).join('\n'));
+  },
+  perfTab: d => { currentPerf = +d.i; },
+  fillHours: () => {
+    const v = prompt('비어 있는 주의 시수를 몇 시간으로 채울까요?', '4');
+    if (v == null || isNaN(num(v))) return false;
+    state.plan.forEach(r => { if (!String(r.hours).trim()) r.hours = String(num(v)); });
+  },
+  resetText: d => {
+    if (!confirm('이 항목을 양식의 기본 문구로 되돌릴까요? 지금 적은 내용은 지워집니다.')) return false;
+    state.text[d.key] = DEFAULT_TEXT[d.key];
+  },
+  fillRubricStd: d => {
+    const p = state.perfs[+d.i];
+    const codes = extractCodes(p.standards);
+    if (!codes.length) { alert('3단계(평가 설계)에서 이 수행평가의 성취기준을 먼저 골라 주세요.'); return false; }
+    const byCode = Object.fromEntries(allStandards().map(s => [s.code, s]));
+    p.rubric.standards = codes.map(c => `[${c}] ${byCode[c] ? byCode[c].text : ''}`.trim()).join('\n');
+  },
   planAdd: () => { state.plan.push(newPlanRow()); },
   planInsert: d => { state.plan.splice(+d.i + 1, 0, newPlanRow()); },
   planDel: d => { if (confirm('이 행을 삭제할까요?')) state.plan.splice(+d.i, 1); else return false; },
@@ -501,6 +612,7 @@ const actions = {
     const sem = prompt('새 평가계획을 만듭니다. 학기를 입력하세요 (1 또는 2)\n※ 현재 내용은 지워집니다. 필요하면 먼저 [파일로 저장]하세요.', state.meta.semester || '2');
     if (sem == null) return false;
     state = blankState(String(sem).trim() === '1' ? '1' : '2');
+    step = 0;
   },
   loadExample: () => {
     if (!confirm('양식의 <예시>(공통국어1)를 불러올까요? 현재 내용은 지워집니다.')) return false;
@@ -509,7 +621,7 @@ const actions = {
   },
   saveFile: () => { downloadBlob(new Blob([JSON.stringify(state, null, 1)], { type: 'application/json' }), fileBase() + '.json'); return false; },
   exportHwpx: () => { exportHwpx(); return false; },
-  print: () => { window.print(); return false; },
+  print: () => { renderDoc(); $('#doc').hidden = false; setTimeout(() => window.print(), 50); return false; },
 };
 function move(arr, i, dir) {
   const j = i + dir;
@@ -637,6 +749,7 @@ function cleanDocHTML() {
 
 function exportHwpx() {
   const root = document.createElement('div');
+  renderDoc();
   root.innerHTML = cleanDocHTML();
   setStatus('한글 파일 만드는 중…');
   HWPX.ensureTemplate()
