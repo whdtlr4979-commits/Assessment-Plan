@@ -523,7 +523,11 @@ document.addEventListener('click', e => {
   if (!b) return;
   e.preventDefault();
   const fn = actions[b.dataset.act];
-  if (!fn) return;
+  if (!fn) {
+    // 새 화면(index.html)과 예전 스크립트가 섞여 불러와진 경우
+    alert('사이트가 업데이트되었습니다. Ctrl+Shift+R(또는 Ctrl+F5)로 새로고침한 뒤 다시 눌러 주세요.');
+    return;
+  }
   const result = fn({ ...b.dataset });
   if (result !== false) { render(); saveSoon(); }
 });
@@ -539,7 +543,7 @@ function loadStandards(id) {
   const entry = (window.STANDARDS_INDEX || []).find(s => s.id === id);
   if (!entry) { alert('목록에 없는 과목입니다: ' + id); return; }
   const sc = document.createElement('script');
-  sc.src = 'data/standards/' + encodeURIComponent(entry.file);
+  sc.src = 'data/standards/' + encodeURIComponent(entry.file) + '?v=' + (window.APP_VERSION || '');
   sc.onload = apply;
   sc.onerror = () => alert('성취기준 파일을 불러오지 못했습니다: ' + entry.file);
   document.head.appendChild(sc);

@@ -260,7 +260,7 @@ const HWPX = (() => {
     if (window.HWPX_TEMPLATE) return Promise.resolve();
     return new Promise((resolve, reject) => {
       const sc = document.createElement('script');
-      sc.src = 'js/hwpx-template.js';
+      sc.src = 'js/hwpx-template.js?v=' + (window.APP_VERSION || '');
       sc.onload = () => resolve();
       sc.onerror = () => reject(new Error('js/hwpx-template.js 를 불러오지 못했습니다'));
       document.head.appendChild(sc);
