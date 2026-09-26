@@ -6,52 +6,50 @@
   <title>교수학습 및 평가 운영 계획 작성기</title>
   <link rel="icon" href="data:,">
   <!-- 파일을 고치면 아래 버전(v=)을 올려 주세요: 브라우저가 예전 파일을 쓰지 않도록 함 -->
-  <script>window.APP_VERSION = '20260927a';</script>
-  <link rel="stylesheet" href="css/style.css?v=20260927a">
+  <script>window.APP_VERSION = '20260928a';</script>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <link rel="stylesheet" href="css/style.css?v=20260928a">
 </head>
 <body>
   <header class="topbar">
-    <div class="brand">교수학습·평가 계획 작성기</div>
-    <div id="status" class="status"></div>
-    <div class="top-actions">
-      <button type="button" class="btn ghost" data-act="newPlan">새로 만들기</button>
-      <button type="button" class="btn ghost" data-act="loadExample">예시 보기</button>
-      <label class="btn ghost" title="[작성 파일 저장]으로 저장한 .json 파일을 불러옵니다">파일 열기<input type="file" id="planFile" accept=".json" hidden></label>
-      <button type="button" class="btn ghost" data-act="saveFile" title="작성 중인 내용을 파일로 저장합니다. 동료 교사와 공유하거나 다른 컴퓨터에서 이어서 작성할 때 쓰세요.">파일로 저장</button>
-      <button type="button" class="btn primary" data-act="exportHwpx">한글 다운로드</button>
-    </div>
+    <div class="brand">교수학습·평가 계획</div>
+    <span id="status" class="status"></span>
+    <nav class="top-actions">
+      <button type="button" class="btn btn-text" data-act="newPlan">새로 만들기</button>
+      <button type="button" class="btn btn-text" data-act="loadExample">예시 보기</button>
+      <label class="btn btn-text" title="저장해 둔 작성 파일(.json)을 불러옵니다">파일 열기<input type="file" id="planFile" accept=".json" hidden></label>
+      <button type="button" class="btn btn-text" data-act="saveFile" title="작성 중인 내용을 파일로 저장합니다. 동료와 공유하거나 다른 컴퓨터에서 이어서 작성할 때 쓰세요.">파일로 저장</button>
+      <button type="button" class="btn btn-primary small" data-act="exportHwpx">한글 파일 내려받기</button>
+    </nav>
   </header>
-  <nav id="stepNav" class="step-nav" aria-label="작성 단계"></nav>
 
-  <main class="app">
-    <div id="stepPanel" class="step-panel"></div>
-    <div id="doc" class="doc" hidden></div>
-    <div id="stepFoot" class="step-foot"></div>
-  </main>
+  <div class="layout">
+    <nav id="stepNav" class="sidebar" aria-label="작성 단계"></nav>
+    <main class="content">
+      <div id="stepPanel"></div>
+      <div id="doc" class="doc" hidden></div>
+      <div id="stepFoot" class="step-foot"></div>
+    </main>
+  </div>
 
-  <dialog id="picker">
-    <h2>성취기준 선택</h2>
-    <div id="pickerType" class="picker-type">
-      평가 유형 표시:
-      <select id="pickerTypeSel">
-        <option value="">(표시 안 함)</option>
-        <option>1차 정기시험</option>
-        <option>2차 정기시험</option>
-        <option>수행평가</option>
-      </select>
-    </div>
-    <div id="pickerBody" class="picker-body"></div>
-    <div class="picker-actions">
-      <button type="button" id="pickerCancel">취소</button>
-      <button type="button" id="pickerApply" class="primary">적용</button>
-    </div>
+  <dialog id="picker" class="sheet-dialog">
+    <header class="dialog-head">
+      <h2 id="pickerTitle">성취기준 선택</h2>
+      <p id="pickerHint" class="muted"></p>
+    </header>
+    <div id="pickerBody" class="dialog-body"></div>
+    <footer class="dialog-foot">
+      <button type="button" id="pickerCancel" class="btn btn-secondary">취소</button>
+      <button type="button" id="pickerApply" class="btn btn-primary">적용</button>
+    </footer>
   </dialog>
 
-  <script src="js/defaults.js?v=20260927a"></script>
-  <script src="js/example.js?v=20260927a"></script>
-  <script src="data/standards/index.js?v=20260927a"></script>
-  <script src="js/hwpx.js?v=20260927a"></script>
-  <script src="js/steps.js?v=20260927a"></script>
-  <script src="js/app.js?v=20260927a"></script>
+  <script src="js/defaults.js?v=20260928a"></script>
+  <script src="js/example.js?v=20260928a"></script>
+  <script src="data/standards/index.js?v=20260928a"></script>
+  <script src="js/hwpx.js?v=20260928a"></script>
+  <script src="js/steps.js?v=20260928a"></script>
+  <script src="js/app.js?v=20260928a"></script>
 </body>
 </html>
