@@ -239,15 +239,141 @@ def parse_tables(path, pages=None):
 # 글자 위치로 읽는 방식 (교육과정평가원 성취수준 자료처럼 가로줄만 있는 표)
 #   왼쪽 칸 = 성취기준, 가운데 칸 = A~E, 오른쪽 칸 = 성취수준 문장
 # ---------------------------------------------------------------------------
+# 한글 수식 글꼴(HyhwpEQ, HancomEQN)은 글자를 사용자 정의 영역(U+E000~)에 두므로 실제 글자로 바꿈
+# (PDF에 들어 있는 글꼴의 글자 모양을 그려 보고 만든 대응표)
+EQ_MAP = {}
+for _i in range(26):
+    EQ_MAP[0xE000 + _i] = chr(65 + _i)        # A-Z
+    EQ_MAP[0xE0E5 + _i] = chr(97 + _i)        # a-z
+for _i, _d in enumerate('1234567890'):
+    EQ_MAP[0xE034 + _i] = _d
+EQ_MAP.update({
+    0xE03E: '!', 0xE042: '%', 0xE043: '*', 0xE044: '(', 0xE045: ')', 0xE046: '−', 0xE047: '=', 0xE048: '+',
+    0xE049: '[', 0xE04A: ']', 0xE04B: '{', 0xE04C: '}', 0xE04D: '|', 0xE04F: ':', 0xE052: ',', 0xE053: '.',
+    0xE054: '/', 0xE055: '<', 0xE056: '>', 0xE05B: '∫', 0xE05C: '√', 0xE063: '^', 0xE067: 'Σ', 0xE06E: '→',
+    0xE088: 'Δ', 0xE099: 'Φ', 0xE09D: 'α', 0xE09E: 'β', 0xE0A1: 'ϵ', 0xE0A4: 'θ', 0xE0A6: 'κ', 0xE0A7: 'λ',
+    0xE0A8: 'μ', 0xE0AC: 'π', 0xE0AD: 'ρ', 0xE0AE: 'σ', 0xE0B2: 'χ', 0xE0C8: '°', 0xE10E: 'ε',
+    # 큰 괄호 조각: 위쪽 조각만 괄호로 쓰고 나머지 조각은 버림
+    0xE078: '', 0xE079: '{', 0xE07A: '', 0xE07B: '', 0xE07C: '(', 0xE07D: '', 0xE07E: '', 0xE07F: '', 0xE080: '',
+    0xE081: ')', 0xE100: '[', 0xE101: '', 0xE102: ']', 0xE103: '', 0xE104: '', 0xE105: '',
+    0xE06D: '',                                # 가로 막대(분수선·윗줄)는 따로 처리
+    0xF06C: '●', 0xF09F: '•', 0xF0FC: '✓',   # Wingdings
+})
+SUP = dict(zip('0123456789+−-=()abcdefghijklmnoprstuvwxyz', '⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁻⁼⁽⁾ᵃᵇᶜᵈᵉᶠᵍʰⁱʲᵏˡᵐⁿᵒᵖʳˢᵗᵘᵛʷˣʸᶻ'))
+SUB = dict(zip('0123456789+−-=()aehijklmnoprstuvx', '₀₁₂₃₄₅₆₇₈₉₊₋₋₌₍₎ₐₑₕᵢⱼₖₗₘₙₒₚᵣₛₜᵤᵥₓ'))
+
+
+def _is_pua(c):
+    t = c['text']
+    return bool(t) and 0xE000 <= ord(t[0]) <= 0xF8FF
+
+
+# 글자 정보가 없어 PDF에서 (cid:번호)로만 나오는 글자
+CID_MAP = {59091: '·'}
+
+
+def _is_cid(c):
+    return (c['text'] or '').startswith('(cid:')
+
+
+def _is_eq(c):
+    """수식 글꼴의 글자인지 (보통 글자로 대응된 수식 글자, 글자 정보 없는 글자 포함)"""
+    return _is_pua(c) or _is_cid(c) or 'HyhwpEQ' in (c.get('fontname') or '') or 'HancomEQN' in (c.get('fontname') or '')
+
+
+def _eq_text(c):
+    t = c['text']
+    if _is_cid(c):
+        m = re.match(r'\(cid:(\d+)\)', t)
+        return CID_MAP.get(int(m.group(1)), '') if m else ''
+    return EQ_MAP.get(ord(t[0]), '') if _is_pua(c) else t
+
+
+def _script(run, table, mark):
+    """위/아래 첨자 글자들을 유니코드 첨자로 (못 바꾸는 글자가 있으면 ^( ) / _( ) 표기)"""
+    if all(ch in table for ch in run):
+        return ''.join(table[ch] for ch in run)
+    return f'{mark}{run}' if len(run) == 1 else f'{mark}({run})'
+
+
+def _line_text(cs, top, bottom):
+    """한 줄의 글자들 → 문자열 (수식 글꼴은 실제 글자로, 작고 올라간/내려간 글자는 첨자로)"""
+    size = bottom - top
+    cs = sorted(cs, key=lambda c: c['x0'])
+    # 분수선·윗줄(가로 막대): 막대 위아래 글자를 '위/아래' 로
+    bars = [c for c in cs if _is_pua(c) and ord(c['text'][0]) == 0xE06D and (c['x1'] - c['x0']) > 2]
+    used = set()
+    frac_at = {}
+    for bar in bars:
+        mid = (bar['top'] + bar['bottom']) / 2
+        inside = [c for c in cs if c is not bar and bar['x0'] - 1 <= (c['x0'] + c['x1']) / 2 <= bar['x1'] + 1]
+        num = [c for c in inside if (c['top'] + c['bottom']) / 2 < mid]
+        den = [c for c in inside if (c['top'] + c['bottom']) / 2 > mid]
+        if num and den:
+            wrap = lambda s: s if len(s) == 1 else f'({s})'
+            n = ''.join(_eq_text(c) for c in sorted(num, key=lambda c: c['x0']))
+            d = ''.join(_eq_text(c) for c in sorted(den, key=lambda c: c['x0']))
+            frac_at[id(bar)] = f'{wrap(n)}/{wrap(d)}'
+            used.update(id(c) for c in inside)
+    out, run, kind = [], '', None
+
+    def flush():
+        nonlocal run, kind
+        if run:
+            out.append(_script(run, SUP, '^') if kind == 'sup' else _script(run, SUB, '_'))
+        run, kind = '', None
+
+    for c in cs:
+        if id(c) in frac_at:
+            flush(); out.append(frac_at[id(c)]); continue
+        if id(c) in used:
+            continue
+        t = _eq_text(c)
+        k = None
+        if _is_eq(c) and t and (c['bottom'] - c['top']) < size * 0.9:
+            if c['bottom'] < bottom - 1.5:
+                k = 'sup'
+            elif c['top'] > top + 1.5:
+                k = 'sub'
+        if k:
+            if kind and kind != k:
+                flush()
+            run += t; kind = k
+        else:
+            flush(); out.append(t)
+    flush()
+    return ''.join(out)
+
+
 def _lines(chars, tol=2.0):
-    """글자들을 줄 단위로 묶어 [(top, bottom, text)] 로 반환 (줄 끝 공백 보존)"""
+    """글자들을 줄 단위로 묶어 [(top, bottom, text)] 로 반환 (줄 끝 공백 보존)
+    보통 글자로 먼저 줄을 만들고, 수식 글자는 세로 가운데가 들어가는 줄에 넣음 (첨자·큰 기호가 줄에서 빠지지 않도록)"""
+    base = [c for c in chars if not _is_eq(c)]
+    eqs = [c for c in chars if _is_eq(c)]
     rows = []
-    for c in sorted(chars, key=lambda c: (c['top'], c['x0'])):
+    for c in sorted(base, key=lambda c: (c['top'], c['x0'])):
         if rows and abs(rows[-1][0] - c['top']) <= tol:
             rows[-1][2].append(c)
+            rows[-1][1] = max(rows[-1][1], c['bottom'])
         else:
             rows.append([c['top'], c['bottom'], [c]])
-    return [(t, b, ''.join(ch['text'] for ch in sorted(cs, key=lambda ch: ch['x0']))) for t, b, cs in rows]
+    for c in eqs:
+        mid = (c['top'] + c['bottom']) / 2
+        best = None
+        for r in rows:
+            if r[0] - 1 <= mid <= r[1] + 1:
+                best = r
+                break
+        if best is None and rows:
+            near = min(rows, key=lambda r: abs((r[0] + r[1]) / 2 - mid))
+            if abs((near[0] + near[1]) / 2 - mid) <= 8:
+                best = near
+        if best is None:
+            best = [c['top'], c['bottom'], []]
+            rows.append(best)
+        best[2].append(c)
+    rows.sort(key=lambda r: r[0])
+    return [(t, b, _line_text(cs, t, b)) for t, b, cs in rows]
 
 
 def _text(chars):
