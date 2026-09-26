@@ -4,6 +4,7 @@ window.STANDARDS_INDEX = [
   "id": "공통국어1",
   "subject": "공통국어1",
   "group": "국어",
+  "codePrefix": "10공국1",
   "file": "공통국어1.js"
  }
 ];

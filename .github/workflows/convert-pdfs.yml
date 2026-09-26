@@ -6,6 +6,7 @@ on:
     paths:
       - 'pdfs/**.pdf'
       - 'pdfs/**.PDF'
+      - 'tools/subject_names.json'
   workflow_dispatch:
 
 permissions:
@@ -28,13 +29,14 @@ jobs:
       - name: 바뀐 PDF 변환 (수동 실행 시 전체)
         run: |
           BEFORE="${{ github.event.before }}"
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ -z "$BEFORE" ] || ! git cat-file -e "$BEFORE" 2>/dev/null; then
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ -z "$BEFORE" ] || ! git cat-file -e "$BEFORE" 2>/dev/null \
+             || ! git diff --quiet "$BEFORE" HEAD -- tools/subject_names.json; then
             find pdfs -iname '*.pdf' -print0 > files.lst
           else
             git diff --name-only -z --diff-filter=AM "$BEFORE" HEAD -- 'pdfs/' | grep -zi '\.pdf$' > files.lst || true
           fi
           if [ ! -s files.lst ]; then echo "변환할 PDF가 없습니다."; exit 0; fi
-          xargs -0 python tools/pdf_to_standards.py < files.lst | tee convert-log.txt
+          xargs -0 python tools/pdf_to_standards.py < files.lst 2>&1 | tee convert-log.txt
           echo '## 변환 결과' >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
           cat convert-log.txt >> "$GITHUB_STEP_SUMMARY"

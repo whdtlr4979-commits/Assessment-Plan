@@ -33,19 +33,33 @@
 과목별 성취수준 PDF는 채팅에 올릴 필요 없이 **이 저장소의 `pdfs/` 폴더에 올리면 자동으로 변환**됩니다.
 
 1. GitHub 저장소 화면에서 `pdfs` 폴더로 이동 → **Add file → Upload files**
-2. PDF 파일을 끌어다 놓기 (한 번에 최대 100개, 파일당 25MB 이하)
-   - 교과별 폴더로 나누면 과목 선택 목록이 교과군으로 묶입니다: `pdfs/국어/공통국어1.pdf`, `pdfs/수학/공통수학1.pdf` …
-   - **파일 이름이 곧 과목명**이 됩니다 (예: `공통국어1.pdf` → 공통국어1)
+2. PDF 파일을 끌어다 놓기 (한 번에 최대 100개, 파일당 25MB 이하 — 큰 파일은 아래 참고)
 3. **Commit changes** 를 누르면 GitHub Actions(「성취수준 PDF 변환」)가 PDF를 읽어
-   `data/standards/과목명.js` 를 만들고 자동으로 커밋합니다. (Actions 탭에서 변환 결과 확인)
+   과목마다 `data/standards/과목명.js` 를 만들고 자동으로 커밋합니다. (Actions 탭에서 변환 결과 확인)
 4. 사이트의 Ⅱ에서 과목을 선택해 불러온 뒤 내용이 맞는지 확인하세요.
+
+**파일 이름이 제각각이어도, 한 PDF에 여러 과목이 있어도 괜찮습니다.**
+
+- 과목은 성취기준 코드 앞부분으로 나눕니다: `[10공국1-01-01]` → `10공국1`, `[12대수01-01]` → `12대수`
+- 과목명은 PDF 본문에서 찾습니다 (예: 코드 `12대수` → 본문의 '대수'). 교과군(국어·수학…)도 과목명으로 추정합니다.
+- 과목명을 잘못 찾았거나 못 찾은 경우(목록에 `12대수` 처럼 코드로 표시됨)에는
+  `tools/subject_names.json` 에 `"12대수": "대수"` 처럼 적어 커밋하면 전체가 다시 변환됩니다.
+
+### 25MB가 넘는 PDF
+
+GitHub 웹 화면은 파일당 25MB까지만 올릴 수 있습니다. 다음 중 편한 방법을 쓰세요.
+
+- **PDF 나누기**: 크롬으로 PDF 열기 → 인쇄(Ctrl+P) → 대상 'PDF로 저장' → 페이지 범위 지정(예: 1-80, 81-160) → 저장.
+  나눈 파일을 그대로 올리면 됩니다. 한 과목이 두 파일에 걸쳐도 코드 기준으로 합쳐집니다.
+  (또는 iLovePDF·알PDF 등의 '분할' 기능)
+- **GitHub Desktop** 프로그램으로 올리기: 파일당 100MB까지 가능합니다.
 
 직접 변환하려면:
 
 ```bash
 pip install pdfplumber
-python tools/pdf_to_standards.py pdfs/국어/*.pdf            # 여러 파일 한꺼번에
-python tools/pdf_to_standards.py 파일.pdf --subject 공통국어1 --group 국어 --pages 10-40
+python tools/pdf_to_standards.py pdfs/*.pdf                 # 여러 파일 한꺼번에
+python tools/pdf_to_standards.py 파일.pdf --pages 10-40 --dry-run   # 저장 없이 결과만 확인
 ```
 
 > PDF마다 표 모양이 달라 일부 문장이 잘리거나 합쳐질 수 있습니다. 변환 결과 요약에 ⚠ 표시된 항목은
@@ -77,6 +91,7 @@ js/app.js                  입력·자동계산·저장
 js/docx.js                 .docx 내보내기 (외부 라이브러리 없음)
 data/standards/            과목별 성취기준·성취수준 데이터
 tools/pdf_to_standards.py  성취수준 PDF → 데이터 변환 도구
+tools/subject_names.json   과목명 직접 지정(코드 앞부분 → 과목명)
 pdfs/                      변환할 PDF를 올리는 폴더
 .github/workflows/         PDF 자동 변환 설정
 ```
