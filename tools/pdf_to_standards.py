@@ -632,7 +632,8 @@ def write_subject(subject, group, prefix, areas, source):
                 old.unlink()
     index = [e for e in index if e['id'] != subject and e.get('codePrefix') != prefix]
     (OUT_DIR / fname).write_text('registerStandards(' + json.dumps(data, ensure_ascii=False, indent=1) + ');\n', encoding='utf-8')
-    index.append({'id': subject, 'subject': subject, 'group': group, 'codePrefix': prefix, 'file': fname})
+    count = sum(len(a['standards']) for a in areas)
+    index.append({'id': subject, 'subject': subject, 'group': group, 'codePrefix': prefix, 'file': fname, 'count': count})
     index.sort(key=lambda e: (e.get('group', ''), e['subject']))
     INDEX.write_text('// 성취기준 데이터 목록 (tools/pdf_to_standards.py 가 자동으로 갱신합니다)\nwindow.STANDARDS_INDEX = '
                      + json.dumps(index, ensure_ascii=False, indent=1) + ';\n', encoding='utf-8')

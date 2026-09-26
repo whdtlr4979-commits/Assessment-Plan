@@ -87,13 +87,13 @@ let step = (() => { try { return Math.max(0, Math.min(7, +localStorage.getItem(S
 function render() {
   const scroll = window.scrollY;
   $('#stepNav').innerHTML = STEPS.map((s, i) => `
-    <button type="button" class="step-tab${i === step ? ' on' : ''}${s.done() ? ' done' : ''}" data-act="goStep" data-step="${i}">
-      <span class="step-no">${s.done() && i !== step ? '✔' : i + 1}</span><span class="step-title">${s.title}</span></button>`).join('');
-  $('#stepPanel').innerHTML = `<div class="step-heading"><span class="step-count">${step + 1} / ${STEPS.length}</span><h2>${STEPS[step].title}</h2></div>`
+    <button type="button" class="nav-item${i === step ? ' on' : ''}${s.done() ? ' done' : ''}" data-act="goStep" data-step="${i}"${i === step ? ' aria-current="step"' : ''}>
+      <span class="nav-no">${i + 1}</span><span class="nav-title">${s.title}</span>${s.done() ? icon('check', 'nav-check') : ''}</button>`).join('');
+  $('#stepPanel').innerHTML = `<header class="page-head"><p class="eyebrow">${step + 1}단계 / ${STEPS.length}</p><h1>${STEPS[step].title}</h1><p class="lead">${STEPS[step].desc}</p></header>`
     + STEPS[step].render();
   $('#stepFoot').innerHTML = `
-    ${step > 0 ? `<button type="button" class="btn secondary" data-act="goStep" data-step="${step - 1}">← ${STEPS[step - 1].title}</button>` : '<span></span>'}
-    ${step < STEPS.length - 1 ? `<button type="button" class="btn primary" data-act="goStep" data-step="${step + 1}">${STEPS[step + 1].title} →</button>` : ''}`;
+    ${step > 0 ? `<button type="button" class="btn btn-secondary" data-act="goStep" data-step="${step - 1}">${icon('left')}${STEPS[step - 1].title}</button>` : '<span></span>'}
+    ${step < STEPS.length - 1 ? `<button type="button" class="btn btn-primary" data-act="goStep" data-step="${step + 1}">다음: ${STEPS[step + 1].title}${icon('right')}</button>` : ''}`;
   const onFinish = STEPS[step].id === 'finish';
   $('#doc').hidden = !onFinish;
   if (onFinish) renderDoc();
@@ -405,14 +405,14 @@ function calc(key) {
     case 'elMaxLabel': return `최고 ${fmt(elMax(state.perfs[+a].rubric.elements[+b]))}점`;
     case 'ratioText': {
       const t = ratioTotal();
-      return t === 100 ? `✔ 합계 ${fmt(t)}%` : `합계 ${fmt(t)}% — ${t < 100 ? `${fmt(100 - t)}% 부족` : `${fmt(t - 100)}% 초과`}`;
+      return t === 100 ? `반영비율 합계 100%` : `반영비율 합계 ${fmt(t)}% · ${t < 100 ? `${fmt(100 - t)}% 부족` : `${fmt(t - 100)}% 초과`}`;
     }
     case 'rubCheck': {
       const p = state.perfs[+a];
       const total = sum(p.rubric.elements.map(elMax));
       const max = num(p.max);
-      if (isNaN(max)) return `평가 요소 최고 배점 합계 ${fmt(total)}점 (평가 개요표에 영역만점을 입력하세요)`;
-      return total === max ? `✔ 평가 요소 배점 합계 ${fmt(total)}점 = 영역만점 ${fmt(max)}점` : `⚠ 평가 요소 배점 합계 ${fmt(total)}점 ≠ 영역만점 ${fmt(max)}점`;
+      if (isNaN(max)) return `배점 합계 ${fmt(total)}점 · 평가 설계에서 영역만점을 입력하세요`;
+      return total === max ? `배점 합계 ${fmt(total)}점 = 영역만점 ${fmt(max)}점` : `배점 합계 ${fmt(total)}점 · 영역만점 ${fmt(max)}점과 다릅니다`;
     }
   }
   return '';
@@ -429,9 +429,11 @@ function updateCalcs() {
   $$('[data-calc]').forEach(el => {
     const v = calc(el.dataset.calc);
     if (el.textContent !== v) el.textContent = v;
-    if (el.classList.contains('check') || el.classList.contains('check-line') || el.classList.contains('meter-text')) {
-      el.classList.toggle('warn', v.startsWith('⚠') || v.startsWith('합계'));
-      el.classList.toggle('ok', v.startsWith('✔'));
+    if (el.classList.contains('status-text')) {
+      const [k, a] = el.dataset.calc.split(':');
+      const ok = k === 'ratioText' ? ratioTotal() === 100 : k === 'rubCheck' ? rubricOk(state.perfs[+a]) : true;
+      el.classList.toggle('ok', ok);
+      el.classList.toggle('warn', !ok);
     }
   });
   $$('[data-calc-html="ratioMeter"]').forEach(el => { el.innerHTML = ratioMeterHTML(); });
@@ -448,6 +450,13 @@ function readValue(el) {
   return el.value;
 }
 document.addEventListener('input', e => {
+  if (e.target.id === 'subjectQuery') {
+    ui.query = e.target.value;
+    $('#subjectResults').innerHTML = subjectResults();
+    $('.group-list').classList.toggle('dim', !!ui.query);
+    $$('.group-list button').forEach(btn => btn.classList.toggle('on', !ui.query && btn.dataset.group === ui.group));
+    return;
+  }
   const el = e.target.closest('[data-bind]');
   if (!el || el.type === 'radio') return;
   const path = el.dataset.bind;
@@ -528,7 +537,23 @@ const actions = {
     codes.sort((a, b2) => order.indexOf(a) - order.indexOf(b2));
     setPath(d.target, codes.map(c => `[${c}]`).join('\n'));
   },
-  perfTab: d => { currentPerf = +d.i; },
+  perfTab: d => { ui.perf = +d.i; },
+  setGroup: d => { ui.group = d.group; ui.query = ''; },
+  areaTab: d => { ui.areaTab = d.tab; },
+  editStd: d => { if (ui.editing.has(d.key)) ui.editing.delete(d.key); else ui.editing.add(d.key); },
+  pickSubjectId: d => {
+    const entry = (window.STANDARDS_INDEX || []).find(s => s.id === d.id);
+    if (!entry) return false;
+    if (state.areas.length && state.standardsSource !== entry.id
+      && !confirm(`성취기준을 ‘${entry.subject}’(으)로 바꿀까요? 지금 불러와 둔 성취기준은 지워집니다.`)) return false;
+    state.meta.subject = entry.subject;
+    state.subjectType = /^10/.test(entry.codePrefix || '')
+      ? (/과학탐구실험/.test(entry.subject) ? '과학탐구실험' : '공통과목')
+      : (/체육|예술/.test(entry.group || '') ? '체육·예술' : '선택과목');
+    afterChange('subjectType');
+    ui.areaTab = 'all'; ui.editing.clear();
+    loadStandards(entry.id);
+  },
   fillHours: () => {
     const v = prompt('비어 있는 주의 시수를 몇 시간으로 채울까요?', '4');
     if (v == null || isNaN(num(v))) return false;
@@ -565,8 +590,15 @@ const actions = {
     return false;
   },
   clearAreas: () => { if (!confirm('Ⅱ의 성취기준을 모두 지울까요?')) return false; state.areas = []; state.standardsSource = ''; },
-  addArea: () => { state.areas.push({ name: '', standards: [newStandard()] }); },
-  addStd: d => { state.areas[+d.ai].standards.push(newStandard()); },
+  addArea: () => {
+    state.areas.push({ name: '', standards: [newStandard()] });
+    const ai = state.areas.length - 1;
+    ui.editing.add(`area:${ai}`); ui.editing.add(`${ai}:0`); ui.areaTab = String(ai);
+  },
+  addStd: d => {
+    state.areas[+d.ai].standards.push(newStandard());
+    ui.editing.add(`${d.ai}:${state.areas[+d.ai].standards.length - 1}`);
+  },
   delStd: d => { if (!confirm('이 성취기준을 삭제할까요?')) return false; state.areas[+d.ai].standards.splice(+d.si, 1); },
   delArea: d => { if (!confirm('이 영역을 통째로 삭제할까요?')) return false; state.areas.splice(+d.ai, 1); },
   addExam: () => { state.exams.push(newExam(`${state.exams.length + 1}차시험`)); },
@@ -679,26 +711,59 @@ function allStandards() { return state.areas.flatMap(a => a.standards.map(s => (
 function extractCodes(text) { return [...String(text || '').matchAll(/\[([^\]\s]+)\]/g)].map(m => m[1].replace(/—/g, '-')); }
 
 /* ---------- 성취기준 선택 창 ---------- */
+function evalTypes() {
+  const exams = state.exams.map(e => `${String(e.name || '').replace(/\s*시험$/, '')} 정기시험`.trim());
+  return [...exams, '수행평가'];
+}
+/* 계획표 칸의 "[코드](유형1, 유형2)" 줄 읽기 */
+function parsePlanStd(text) {
+  const out = {};
+  String(text || '').split('\n').forEach(line => {
+    const m = line.match(/^\s*\[([^\]\s]+)\]\s*(?:\(([^)]*)\))?/);
+    if (m) out[m[1]] = m[2] ? m[2].split(/\s*[,·]\s*/).filter(Boolean) : [];
+  });
+  return out;
+}
 function openPicker(target, mode) {
   const dlg = $('#picker');
-  const list = state.areas;
-  const current = extractCodes(getPath(target));
-  const body = list.length ? list.map(a => `
-      <fieldset><legend>${esc(a.name)}</legend>
-      ${a.standards.map(s => `<label class="pick-item"><input type="checkbox" value="${esc(s.code)}" ${current.includes(s.code) ? 'checked' : ''}>
-        <b>[${esc(s.code)}]</b> ${esc(s.text)}</label>`).join('')}
-      </fieldset>`).join('')
-    : '<p>Ⅱ. 성취기준별 성취수준에서 먼저 과목 성취기준을 불러오세요.</p>';
-  $('#pickerBody').innerHTML = body;
-  $('#pickerType').hidden = mode !== 'plan';
+  const isPlan = mode === 'plan';
+  const types = evalTypes();
+  const current = isPlan ? parsePlanStd(getPath(target)) : Object.fromEntries(extractCodes(getPath(target)).map(c => [c, []]));
+  $('#pickerTitle').textContent = isPlan ? '성취기준과 평가 유형 선택' : '성취기준 선택';
+  $('#pickerHint').textContent = isPlan ? '성취기준을 고르고, 그 성취기준을 평가하는 유형을 모두 고르세요. 평가하지 않으면 유형을 비워 두면 됩니다.' : '평가할 성취기준을 모두 고르세요.';
+  $('#pickerBody').innerHTML = state.areas.length ? state.areas.map(a => `
+      <div class="pick-group"><h4>${esc(a.name)}</h4>
+      ${a.standards.map(s => {
+        const on = s.code in current;
+        return `<div class="pick-row${on ? ' on' : ''}">
+          <label class="pick-main"><input type="checkbox" class="pick-std" value="${esc(s.code)}"${on ? ' checked' : ''}>
+            <span class="code">${esc(s.code)}</span><span class="pick-text">${esc(s.text)}</span></label>
+          ${isPlan ? `<div class="pick-types chips">${types.map(t => `<label class="chip"><input type="checkbox" class="pick-type" value="${esc(t)}"${(current[s.code] || []).includes(t) ? ' checked' : ''}><span>${esc(t)}</span></label>`).join('')}</div>` : ''}
+        </div>`;
+      }).join('')}</div>`).join('')
+    : '<p class="muted">먼저 성취기준을 불러오세요.</p>';
+  // 유형을 누르면 그 성취기준도 자동으로 선택
+  $('#pickerBody').onchange = e => {
+    const row = e.target.closest('.pick-row');
+    if (!row) return;
+    if (e.target.classList.contains('pick-type') && e.target.checked) row.querySelector('.pick-std').checked = true;
+    row.classList.toggle('on', row.querySelector('.pick-std').checked);
+  };
   $('#pickerApply').onclick = () => {
-    const codes = $$('#pickerBody input:checked').map(i => i.value);
     const byCode = Object.fromEntries(allStandards().map(s => [s.code, s]));
-    const type = $('#pickerTypeSel').value;
+    const rows = $$('#pickerBody .pick-row').filter(r => r.querySelector('.pick-std').checked);
     let out;
-    if (mode === 'plan') out = codes.map(c => `[${c}]${type ? `(${type})` : ''}\n${byCode[c].text}`).join('\n');
-    else if (mode === 'full') out = codes.map(c => `[${c}] ${byCode[c].text}`).join('\n');
-    else out = codes.map(c => `[${c}]`).join('\n');
+    if (isPlan) {
+      out = rows.map(r => {
+        const c = r.querySelector('.pick-std').value;
+        const ts = $$('.pick-type', r).filter(x => x.checked).map(x => x.value);
+        return `[${c}]${ts.length ? `(${ts.join(', ')})` : ''}\n${byCode[c] ? byCode[c].text : ''}`;
+      }).join('\n');
+    } else if (mode === 'full') {
+      out = rows.map(r => { const c = r.querySelector('.pick-std').value; return `[${c}] ${byCode[c] ? byCode[c].text : ''}`; }).join('\n');
+    } else {
+      out = rows.map(r => `[${r.querySelector('.pick-std').value}]`).join('\n');
+    }
     setPath(target, out);
     dlg.close();
     render(); saveSoon();
