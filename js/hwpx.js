@@ -51,6 +51,7 @@ const HWPX = (() => {
   }
 
   /* ---------- 표 ----------
+   * 글자처럼 취급 안 함(treatAsChar=0), 쪽 경계에서 나눔(pageBreak=TABLE) — 긴 표가 다음 쪽으로 이어짐
    * rows: [[{ paras, cs, rs, bf, va }]] (병합으로 가려진 칸은 넣지 않음), widths: 열 너비 */
   function table(rows, widths, opt = {}) {
     const occ = [];
@@ -71,9 +72,9 @@ const HWPX = (() => {
     const heights = rows.map((_, r) => (opt.rowHeights && opt.rowHeights[r]) || opt.rowH || 1200);
     const total = widths.reduce((a, b) => a + b, 0);
     const m = opt.margin || [141, 141];
-    let xml = `<hp:tbl id="${++tblId}" zOrder="${zOrder++}" numberingType="TABLE" textWrap="TOP_AND_BOTTOM" textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" pageBreak="CELL" repeatHeader="1" rowCnt="${rows.length}" colCnt="${widths.length}" cellSpacing="0" borderFillIDRef="${opt.bf || BF.table}" noAdjust="0">`
+    let xml = `<hp:tbl id="${++tblId}" zOrder="${zOrder++}" numberingType="TABLE" textWrap="TOP_AND_BOTTOM" textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" pageBreak="TABLE" repeatHeader="1" rowCnt="${rows.length}" colCnt="${widths.length}" cellSpacing="0" borderFillIDRef="${opt.bf || BF.table}" noAdjust="0">`
       + `<hp:sz width="${total}" widthRelTo="ABSOLUTE" height="${heights.reduce((a, b) => a + b, 0)}" heightRelTo="ABSOLUTE" protect="0"/>`
-      + `<hp:pos treatAsChar="1" affectLSpacing="0" flowWithText="1" allowOverlap="0" holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="PARA" vertAlign="TOP" horzAlign="LEFT" vertOffset="0" horzOffset="0"/>`
+      + `<hp:pos treatAsChar="0" affectLSpacing="0" flowWithText="1" allowOverlap="0" holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="COLUMN" vertAlign="TOP" horzAlign="LEFT" vertOffset="0" horzOffset="0"/>`
       + `<hp:outMargin left="283" right="283" top="283" bottom="283"/><hp:inMargin left="${m[0]}" right="${m[0]}" top="${m[1]}" bottom="${m[1]}"/>`;
     rows.forEach((row, r) => {
       xml += '<hp:tr>';
