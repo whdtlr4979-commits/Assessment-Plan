@@ -57,8 +57,8 @@ function exampleState() {
 
   const exam = (name, std, rank) => {
     const e = newExam(name, '30');
-    e.subs[0].max = '50점 (이하)'; e.subs[0].ratio = '15%\n(이하)';
-    e.subs[1].max = '50점(이상)\n(30점(이상))'; e.subs[1].ratio = '15%(이상)\n(9%(이상))';
+    e.subs[0].max = '50'; e.subs[0].ratio = '15';
+    e.subs[1].max = '50'; e.subs[1].ratio = '15';
     e.standards = std; e.tieRank = rank;
     return e;
   };
@@ -69,14 +69,16 @@ function exampleState() {
   const perf = (name, method, max, ratio, std, base, when, rank) =>
     Object.assign(newPerf(name), { method, max, ratio, standards: std, base, when, tieRank: rank });
   s.perfs = [
-    perf('진로 독서를 바탕으로 매체자료 제작하기', '프로젝트', '15', '15', '[10공국1-02-02]\n[10공국1-06-02]', '5점', '8월', '3'),
-    perf('사회적 쟁점으로 토론하기', '토의·토론', '15', '15', '[10공국1-01-02]\n[10공국1-03-01]', '5점', '9월', '4'),
-    perf('개성이 드러나는 글쓰기', '서술', '10', '10', '[10공국1-03-02]', '3점', '10월~11월', '5'),
+    perf('진로 독서를 바탕으로 매체자료 제작하기', '프로젝트', '15', '15', '[10공국1-02-02]\n[10공국1-06-02]', '5', '8월', '3'),
+    perf('사회적 쟁점으로 토론하기', '토의·토론', '15', '15', '[10공국1-01-02]\n[10공국1-03-01]', '5', '9월', '4'),
+    perf('개성이 드러나는 글쓰기', '서술·논술', '10', '10', '[10공국1-03-02]', '3', '10월~11월', '5'),
   ];
   const r = s.perfs[0].rubric;
   r.task = '진로에 맞는 책을 선정하여 읽고, 이를 바탕으로 소통 맥락과 매체 특성을 바탕으로 한 매체 자료 제작하기';
   r.standards = '[10공국1-02-02] 자신의 진로나 관심 분야와 관련한 다양한 글이나 자료를 찾아 주제 통합적으로 읽고 읽은 결과를 공유한다.\n[10공국1-06-02] 소통 맥락과 매체 특성을 고려하여 다양한 목적의 매체 자료를 제작한다.';
-  r.methods = ['프로젝트']; r.observe = ['교사 관찰 및 기록'];
+  r.methods = ['프로젝트'];
+  s.perfs[1].rubric.methods = ['토의·토론'];
+  s.perfs[2].rubric.methods = ['서술·논술']; r.observe = ['교사 관찰 및 기록'];
   r.elements = [
     { name: '진로 분야 책 선정 및 읽기', criteria: [
       { text: '자신의 진로나 관심 분야와 관련한 책을 선정해 스스로 수립한 독서 계획에 따라 책 읽기를 진행함.', score: '5' },

@@ -58,11 +58,34 @@ function migrate(s) {
   out.tie = Object.assign(blankState().tie, s.tie || {});
   out.rateTables = Object.assign(blankState().rateTables, s.rateTables || {});
   out.perfs = (out.perfs || []).map(p => Object.assign(newPerf(), p, { rubric: Object.assign(newRubric(), p.rubric || {}) }));
+  // 영역만점·반영비율·기본점수는 숫자만 저장하고 '점'·'%'는 화면과 문서에서 붙임 (예전 "50점 (이하)" → "50")
+  (out.exams || []).forEach(e => {
+    e.base = numOnly(e.base);
+    (e.subs || []).forEach(x => { x.max = numOnly(x.max); x.ratio = numOnly(x.ratio); });
+  });
+  out.perfs.forEach(p => { p.base = numOnly(p.base); p.max = numOnly(p.max); p.ratio = numOnly(p.ratio); });
   if (!s.subjectType) {
     const rt = out.rateTables;
     out.subjectType = rt.common ? '공통과목' : rt.elective ? '선택과목' : rt.sciLab ? '과학탐구실험' : rt.artsPe ? '체육·예술' : '공통과목';
   }
   return out;
+}
+/* 수행평가 평가방법을 바꾸면 채점기준표의 평가방법 체크도 함께 바꿈 */
+function setPerfMethods(i, list) {
+  const p = state.perfs[i], r = p.rubric.methods;
+  const before = splitMethods(p.method).map(rubricMethodName), after = list.map(rubricMethodName);
+  p.method = list.join(', ');
+  before.filter(m => !after.includes(m)).forEach(m => { const k = r.indexOf(m); if (k >= 0) r.splice(k, 1); });
+  after.forEach(m => { if (!r.includes(m)) r.push(m); });
+}
+function addPerfMethod(i) {
+  const box = document.querySelector(`[data-pmethod-new="${i}"]`);
+  // '논술'처럼 목록 방법의 줄임말은 목록 이름으로 ('서술·논술')
+  const names = splitMethods(box && box.value).map(m => PERF_METHODS.includes(rubricMethodName(m)) ? rubricMethodName(m) : m);
+  if (!names.length) { if (box) box.focus(); return false; }
+  const cur = splitMethods(state.perfs[i].method);
+  setPerfMethods(i, [...cur, ...names.filter(m => !cur.includes(m))]);
+  return true;
 }
 let saveTimer = null;
 function saveSoon() {
@@ -299,12 +322,12 @@ function renderOverview() {
         ${perfCells((p, i) => `${ce(`perfs.${i}.name`, { ph: '수행평가 영역명' })}<div class="no-export">${btn('perfLeft', '◀', { i }, 'icon')}${btn('perfRight', '▶', { i }, 'icon')}${btn('delPerf', '삭제', { i }, 'danger')}</div>`)}
       </tr>
       <tr><th>평가방법</th>${subCells((s, i, j) => ce(`exams.${i}.subs.${j}.method`))}${perfCells((p, i) => ce(`perfs.${i}.method`, { ph: '예: 프로젝트' }))}</tr>
-      <tr><th>영역만점</th>${subCells((s, i, j) => ce(`exams.${i}.subs.${j}.max`, { ph: '50점' }))}${perfCells((p, i) => `${ce(`perfs.${i}.max`, { inline: true, ph: '15' })}점`)}</tr>
-      <tr><th>학기말<br>반영비율</th>${subCells((s, i, j) => ce(`exams.${i}.subs.${j}.ratio`, { ph: '15%' }))}${perfCells((p, i) => `${ce(`perfs.${i}.ratio`, { inline: true, ph: '15' })}%`)}</tr>
+      <tr><th>영역만점</th>${subCells((s, i, j) => `${ce(`exams.${i}.subs.${j}.max`, { inline: true, ph: '50' })}점`)}${perfCells((p, i) => `${ce(`perfs.${i}.max`, { inline: true, ph: '15' })}점`)}</tr>
+      <tr><th>학기말<br>반영비율</th>${subCells((s, i, j) => `${ce(`exams.${i}.subs.${j}.ratio`, { inline: true, ph: '15' })}%`)}${perfCells((p, i) => `${ce(`perfs.${i}.ratio`, { inline: true, ph: '15' })}%`)}</tr>
       <tr><th>교육과정<br>성취기준</th>
         ${examCells((e, i) => ce(`exams.${i}.standards`, { cls: 'left' }) + btn('pickStd', '선택', { target: `exams.${i}.standards`, mode: 'code' }))}
         ${perfCells((p, i) => ce(`perfs.${i}.standards`, { cls: 'left' }) + btn('pickStd', '선택', { target: `perfs.${i}.standards`, mode: 'code' }))}</tr>
-      <tr><th>기본점수</th>${examCells((e, i) => ce(`exams.${i}.base`))}${perfCells((p, i) => ce(`perfs.${i}.base`, { ph: '영역만점의 10%이상~40%미만' }))}</tr>
+      <tr><th>기본점수</th>${examCells((e, i) => `${ce(`exams.${i}.base`, { inline: true, ph: '0' })}점`)}${perfCells((p, i) => `${ce(`perfs.${i}.base`, { inline: true, ph: '5' })}점`)}</tr>
       <tr><th>평가시기</th>${examCells((e, i) => ce(`exams.${i}.when`))}${perfCells((p, i) => ce(`perfs.${i}.when`, { ph: 'O월' }))}</tr>
     </table>
     <div class="table-actions no-export">
@@ -350,8 +373,12 @@ function renderRates() {
 
 function renderRubric(p, i) {
   const r = p.rubric, base = `perfs.${i}.rubric`;
-  const checks = (list, key) => list.map(m =>
-    `<label class="chk"><input type="checkbox" data-arr="${base}.${key}" value="${esc(m)}" ${r[key].includes(m) ? 'checked' : ''}> ${esc(m)}</label>`).join('&nbsp;&nbsp;&nbsp;');
+  // 목록에 없는 평가방법(직접 입력)은 '기타(…)'에 적어 체크
+  const extra = r.methods.filter(m => !EVAL_METHODS.includes(m));
+  const checks = (list, key) => list.map(m => {
+    const other = key === 'methods' && m === '기타' && extra.length;
+    return `<label class="chk"><input type="checkbox" data-arr="${base}.${key}" value="${esc(m)}" ${r[key].includes(m) || other ? 'checked' : ''}> ${esc(other ? `기타(${extra.join(', ')})` : m)}</label>`;
+  }).join('&nbsp;&nbsp;&nbsp;');
   const elements = r.elements.map((el, j) => el.criteria.map((c, k) => `
       <tr>
         ${k === 0 ? `<td colspan="2" rowspan="${el.criteria.length}" class="center">${ce(`${base}.elements.${j}.name`, { ph: '평가 요소' })}(<span data-calc="elMax:${i}:${j}"></span>점)
@@ -489,6 +516,11 @@ document.addEventListener('change', e => {
     if (el.dataset.rerender) render();
     saveSoon();
   }
+  if (el.dataset.pmethod !== undefined) {
+    const i = +el.dataset.pmethod, cur = splitMethods(state.perfs[i].method);
+    setPerfMethods(i, el.checked ? [...cur.filter(m => m !== el.value), el.value] : cur.filter(m => m !== el.value));
+    saveSoon();
+  }
   if (el.dataset.arr) {
     const arr = getPath(el.dataset.arr);
     const i = arr.indexOf(el.value);
@@ -510,6 +542,7 @@ document.addEventListener('paste', e => {
 
 /* ---------- 버튼 동작 ---------- */
 const actions = {
+  addPerfMethod: d => addPerfMethod(+d.i),
   toggle: d => { state[d.key] = !state[d.key]; },
   goStep: d => {
     step = Math.max(0, Math.min(STEPS.length - 1, +d.step));
@@ -662,6 +695,14 @@ function move(arr, i, dir) {
 }
 function newStandard() { return { code: '', text: '', levels: { A: '', B: '', C: '', D: '', E: '' } }; }
 
+document.addEventListener('keydown', e => {
+  const el = e.target;
+  if (e.key === 'Enter' && !e.isComposing && el.dataset && el.dataset.pmethodNew !== undefined) {
+    e.preventDefault();
+    const i = el.dataset.pmethodNew;
+    if (addPerfMethod(+i)) { render(); saveSoon(); const box = document.querySelector(`[data-pmethod-new="${i}"]`); if (box) box.focus(); }
+  }
+});
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-act]');
   if (!b) return;
