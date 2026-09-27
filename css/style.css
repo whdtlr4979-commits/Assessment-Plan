@@ -113,7 +113,7 @@ textarea.input { resize: vertical; min-height: 40px; overflow: hidden; line-heig
 .switch:checked::after { transform: translateX(18px); }
 
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.chip { cursor: pointer; }
+.chip { cursor: pointer; position: relative; }
 .chip input { position: absolute; opacity: 0; pointer-events: none; }
 .chip span, .btn.chip-btn {
   display: inline-block; font: inherit; font-size: 13.5px; line-height: 1.3; padding: 6px 12px; border-radius: 999px;
@@ -252,6 +252,15 @@ details.disclosure[open] > summary { margin-bottom: 14px; }
 .overview-sheet .inline .input:first-child { flex: 1; min-width: 0; }
 .overview-sheet .inline .input.num { width: 48px; padding: 6px 2px; }
 .overview-sheet .names td { position: relative; padding-top: 30px; }
+.overview-sheet .inline.unit .input.num { flex: 1; width: auto; min-width: 40px; text-align: right; padding: 6px 6px; }
+.overview-sheet th { min-width: 92px; }
+.method-chips { gap: 4px; max-width: 190px; }
+.method-add { max-width: 190px; }
+.overview-sheet .inline.unit { max-width: 150px; }
+.method-chips .chip span { font-size: 12.5px; padding: 4px 9px; }
+.method-add { display: flex; align-items: center; gap: 2px; margin-top: 6px; }
+.method-add .input { flex: 1; min-width: 0; padding: 5px 8px; font-size: 13px; }
+.method-add .icon-btn { width: 28px; height: 28px; flex: none; }
 .col-tools { position: absolute; top: 3px; right: 4px; display: flex; }
 .col-tools .icon-btn { width: 24px; height: 24px; }
 .col-tools .ic { width: 14px; height: 14px; }

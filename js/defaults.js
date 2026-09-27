@@ -14,6 +14,23 @@ const PROCEDURE_TEXT = '‘과목별 교수학습 및 평가 운영 계획’ �
 
 const EVAL_METHODS = ['서술·논술', '구술·발표', '토의·토론', '프로젝트', '실험·실습', '포트폴리오', '기타'];
 const OBSERVE_METHODS = ['교사 관찰 및 기록', '자기평가', '동료평가'];
+/* 평가 설계에서 고르는 수행평가 평가방법 (목록에 없는 방법은 직접 입력해 추가) */
+const PERF_METHODS = ['서술·논술', '구술·발표', '토의·토론', '프로젝트', '실험·실습', '포트폴리오', '실기'];
+const METHOD_ALIAS = { '서술': '서술·논술', '논술': '서술·논술', '서술형': '서술·논술', '논술형': '서술·논술', '구술': '구술·발표', '발표': '구술·발표', '토의': '토의·토론', '토론': '토의·토론', '실험': '실험·실습', '실습': '실험·실습' };
+
+/* 평가방법 문자열("프로젝트, 토의·토론") ↔ 목록 */
+function splitMethods(v) {
+  return String(v || '').split(/\s*[,，\n/]\s*/).map(m => m.trim()).filter(Boolean);
+}
+/* 채점기준표의 평가방법 체크 이름으로 바꾸기 */
+function rubricMethodName(m) {
+  return METHOD_ALIAS[m] || m;
+}
+/* "50점 (이하)", "15%" → "50", "15" : 숫자로 시작하면 숫자만 남김 */
+function numOnly(v) {
+  const m = String(v ?? '').match(/^\s*(\d+(?:\.\d+)?)/);
+  return m ? m[1] : (v ?? '');
+}
 const LEVELS = ['A', 'B', 'C', 'D', 'E'];
 
 const RATE_TABLES = {
@@ -113,7 +130,7 @@ function newExam(name, ratio) {
       { method: '선택형', max: '', ratio: '' },
       { method: '서답형\n(서·논술형)', max: '', ratio: '' },
     ],
-    standards: '', base: '0점', when: '학교 일정에 맞춰 실시', tieRank: '',
+    standards: '', base: '0', when: '학교 일정에 맞춰 실시', tieRank: '',
   };
 }
 

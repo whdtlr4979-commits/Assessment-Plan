@@ -214,6 +214,17 @@ function stepStandards() {
 }
 
 /* ---------- 3. 평가 설계 (평가 개요표) ---------- */
+/* 숫자 칸 + 단위(점·%)가 미리 붙어 있는 입력 */
+function unitInput(path, unit, ph) {
+  return `<div class="inline unit">${input(path, { type: 'number', cls: 'num', ph, min: 0 })}<span>${unit}</span></div>`;
+}
+/* 수행평가 평가방법: 목록에서 고르고, 없는 방법은 직접 입력해 추가 */
+function perfMethodPicker(p, i) {
+  const cur = splitMethods(p.method);
+  const opts = [...PERF_METHODS, ...cur.filter(m => !PERF_METHODS.includes(m))];
+  return `<div class="chips method-chips">${opts.map(m => `<label class="chip"><input type="checkbox" data-pmethod="${i}" value="${esc(m)}"${cur.includes(m) ? ' checked' : ''}><span>${esc(m)}</span></label>`).join('')}</div>
+    <div class="method-add"><input class="input" type="text" data-pmethod-new="${i}" placeholder="직접 입력" aria-label="평가방법 직접 입력">${ib('addPerfMethod', 'plus', '평가방법 추가', { i })}</div>`;
+}
 function stepDesign() {
   const E = state.exams, P = state.perfs, nE = E.length * 2, nP = P.length;
   const t = ratioTotal();
@@ -233,13 +244,13 @@ function stepDesign() {
         <tr class="names"><th>횟수/영역</th>
           ${examCells((e, i) => `${colTools('exam', i)}<div class="inline">${input(`exams.${i}.name`, { ph: '1차시험' })}<span>(</span>${input(`exams.${i}.ratio`, { type: 'number', cls: 'num', ph: '30' })}<span>%)</span></div>`)}
           ${perfCells((p, i) => `${colTools('perf', i)}${area(`perfs.${i}.name`, { rows: 2, ph: '수행평가 영역명' })}`)}</tr>
-        <tr><th>평가방법</th>${subCells((s, i, j) => area(`exams.${i}.subs.${j}.method`, { rows: 1 }))}${perfCells((p, i) => area(`perfs.${i}.method`, { rows: 1, ph: '프로젝트' }))}</tr>
-        <tr><th>영역만점</th>${subCells((s, i, j) => area(`exams.${i}.subs.${j}.max`, { rows: 1, ph: '50점' }))}${perfCells((p, i) => `<div class="inline">${input(`perfs.${i}.max`, { type: 'number', cls: 'num', ph: '15' })}<span>점</span></div>`)}</tr>
-        <tr><th>학기말 반영비율</th>${subCells((s, i, j) => area(`exams.${i}.subs.${j}.ratio`, { rows: 1, ph: '15%' }))}${perfCells((p, i) => `<div class="inline">${input(`perfs.${i}.ratio`, { type: 'number', cls: 'num', ph: '15' })}<span>%</span></div>`)}</tr>
+        <tr><th>평가방법</th>${subCells((s, i, j) => area(`exams.${i}.subs.${j}.method`, { rows: 1 }))}${perfCells((p, i) => perfMethodPicker(p, i))}</tr>
+        <tr><th>영역만점</th>${subCells((s, i, j) => unitInput(`exams.${i}.subs.${j}.max`, '점', '50'))}${perfCells((p, i) => unitInput(`perfs.${i}.max`, '점', '15'))}</tr>
+        <tr><th>학기말 반영비율</th>${subCells((s, i, j) => unitInput(`exams.${i}.subs.${j}.ratio`, '%', '15'))}${perfCells((p, i) => unitInput(`perfs.${i}.ratio`, '%', '15'))}</tr>
         <tr><th>교육과정 성취기준</th>
           ${examCells((e, i) => `<div class="codes">${codeList(e.standards)}</div>${b('pickStd', '선택', { target: `exams.${i}.standards`, mode: 'code' }, 'btn-plain small')}`)}
           ${perfCells((p, i) => `<div class="codes">${codeList(p.standards)}</div>${b('pickStd', '선택', { target: `perfs.${i}.standards`, mode: 'code' }, 'btn-plain small')}`)}</tr>
-        <tr><th>기본점수</th>${examCells((e, i) => input(`exams.${i}.base`, { ph: '0점' }))}${perfCells((p, i) => input(`perfs.${i}.base`, { ph: '5점' }))}</tr>
+        <tr><th>기본점수</th>${examCells((e, i) => unitInput(`exams.${i}.base`, '점', '0'))}${perfCells((p, i) => unitInput(`perfs.${i}.base`, '점', '5'))}</tr>
         <tr><th>평가시기</th>${examCells((e, i) => input(`exams.${i}.when`, { ph: '학교 일정에 맞춰 실시' }))}${perfCells((p, i) => input(`perfs.${i}.when`, { ph: '9월' }))}</tr>
       </tbody>
     </table></div>`;
@@ -276,7 +287,7 @@ function stepRubric() {
         <tr><th>수행 과제</th><td colspan="2">${area(`${base}.task`, { ph: '학생이 수행할 과제', rows: 2 })}</td></tr>
         <tr><th>교육과정<br>성취기준</th><td colspan="2">${area(`${base}.standards`, { rows: 2 })}${b('fillRubricStd', '평가 설계에서 고른 성취기준 넣기', { i }, 'btn-plain small')}</td></tr>
         ${LEVELS.map((L, li) => `<tr>${li === 0 ? `<th rowspan="5">평가기준${b('fillRubricLevels', '성취수준에서 가져오기', { i }, 'btn-plain small block')}</th>` : ''}<td class="lv">${L}</td><td>${area(`${base}.levels.${L}`, { rows: 1 })}</td></tr>`).join('')}
-        <tr><th>평가방법</th><td colspan="2">${checkChips(`${base}.methods`, EVAL_METHODS)}</td></tr>
+        <tr><th>평가방법</th><td colspan="2">${checkChips(`${base}.methods`, [...EVAL_METHODS, ...r.methods.filter(m => !EVAL_METHODS.includes(m))])}<p class="help">평가 설계에서 고른 평가방법이 자동으로 체크됩니다.</p></td></tr>
         <tr><th>관찰·평가</th><td colspan="2">${checkChips(`${base}.observe`, OBSERVE_METHODS)}</td></tr>
         <tr><th>학생 유의사항</th><td colspan="2">${area(`${base}.notes`, { rows: 2 })}</td></tr>
       </tbody>
