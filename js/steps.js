@@ -218,12 +218,10 @@ function stepStandards() {
 function unitInput(path, unit, ph) {
   return `<div class="inline unit">${input(path, { type: 'number', cls: 'num', ph, min: 0 })}<span>${unit}</span></div>`;
 }
-/* 수행평가 평가방법: 목록에서 고르고, 없는 방법은 직접 입력해 추가 */
+/* 수행평가 평가방법: 칸에는 고른 방법만 보이고, [선택]을 누르면 창에서 고르거나 직접 추가 */
 function perfMethodPicker(p, i) {
   const cur = splitMethods(p.method);
-  const opts = [...PERF_METHODS, ...cur.filter(m => !PERF_METHODS.includes(m))];
-  return `<div class="chips method-chips">${opts.map(m => `<label class="chip"><input type="checkbox" data-pmethod="${i}" value="${esc(m)}"${cur.includes(m) ? ' checked' : ''}><span>${esc(m)}</span></label>`).join('')}</div>
-    <div class="method-add"><input class="input" type="text" data-pmethod-new="${i}" placeholder="직접 입력" aria-label="평가방법 직접 입력">${ib('addPerfMethod', 'plus', '평가방법 추가', { i })}</div>`;
+  return `<div class="method-tags">${cur.length ? cur.map(m => `<span class="tag">${esc(m)}</span>`).join('') : '<span class="muted">선택 안 함</span>'}</div>${b('pickMethod', '선택', { i }, 'btn-plain small')}`;
 }
 function stepDesign() {
   const E = state.exams, P = state.perfs, nE = E.length * 2, nP = P.length;
@@ -236,7 +234,8 @@ function stepDesign() {
     ? `<div class="col-tools">${ib('delExam', 'x', '이 정기시험 삭제', { i }, 'danger')}</div>`
     : `<div class="col-tools">${ib('perfLeft', 'left', '왼쪽으로', { i })}${ib('perfRight', 'right', '오른쪽으로', { i })}${ib('delPerf', 'x', '이 수행평가 삭제', { i }, 'danger')}</div>`;
   const table = `
-    <div class="sheet-scroll"><table class="sheet overview-sheet">
+    <div class="sheet-scroll"><table class="sheet overview-sheet" style="min-width:${96 + (nE + nP) * 92}px">
+      <colgroup><col style="width:96px">${'<col>'.repeat(nE + nP)}</colgroup>
       <tbody>
         <tr><th>과목명</th><td colspan="${nE + nP}" class="center strong">${esc(state.meta.subject || '(기본 정보에서 과목명 입력)')}</td></tr>
         <tr><th>평가종류</th>${nE ? `<th colspan="${nE}" class="kind">정기시험</th>` : ''}${nP ? `<th colspan="${nP}" class="kind">수행평가</th>` : ''}</tr>
