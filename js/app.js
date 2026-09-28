@@ -78,15 +78,6 @@ function setPerfMethods(i, list) {
   before.filter(m => !after.includes(m)).forEach(m => { const k = r.indexOf(m); if (k >= 0) r.splice(k, 1); });
   after.forEach(m => { if (!r.includes(m)) r.push(m); });
 }
-function addPerfMethod(i) {
-  const box = document.querySelector(`[data-pmethod-new="${i}"]`);
-  // '논술'처럼 목록 방법의 줄임말은 목록 이름으로 ('서술·논술')
-  const names = splitMethods(box && box.value).map(m => PERF_METHODS.includes(rubricMethodName(m)) ? rubricMethodName(m) : m);
-  if (!names.length) { if (box) box.focus(); return false; }
-  const cur = splitMethods(state.perfs[i].method);
-  setPerfMethods(i, [...cur, ...names.filter(m => !cur.includes(m))]);
-  return true;
-}
 let saveTimer = null;
 function saveSoon() {
   clearTimeout(saveTimer);
@@ -516,11 +507,6 @@ document.addEventListener('change', e => {
     if (el.dataset.rerender) render();
     saveSoon();
   }
-  if (el.dataset.pmethod !== undefined) {
-    const i = +el.dataset.pmethod, cur = splitMethods(state.perfs[i].method);
-    setPerfMethods(i, el.checked ? [...cur.filter(m => m !== el.value), el.value] : cur.filter(m => m !== el.value));
-    saveSoon();
-  }
   if (el.dataset.arr) {
     const arr = getPath(el.dataset.arr);
     const i = arr.indexOf(el.value);
@@ -542,7 +528,7 @@ document.addEventListener('paste', e => {
 
 /* ---------- 버튼 동작 ---------- */
 const actions = {
-  addPerfMethod: d => addPerfMethod(+d.i),
+  pickMethod: d => { openMethodPicker(+d.i); return false; },
   toggle: d => { state[d.key] = !state[d.key]; },
   goStep: d => {
     step = Math.max(0, Math.min(STEPS.length - 1, +d.step));
@@ -695,14 +681,6 @@ function move(arr, i, dir) {
 }
 function newStandard() { return { code: '', text: '', levels: { A: '', B: '', C: '', D: '', E: '' } }; }
 
-document.addEventListener('keydown', e => {
-  const el = e.target;
-  if (e.key === 'Enter' && !e.isComposing && el.dataset && el.dataset.pmethodNew !== undefined) {
-    e.preventDefault();
-    const i = el.dataset.pmethodNew;
-    if (addPerfMethod(+i)) { render(); saveSoon(); const box = document.querySelector(`[data-pmethod-new="${i}"]`); if (box) box.focus(); }
-  }
-});
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-act]');
   if (!b) return;
@@ -806,6 +784,42 @@ function openPicker(target, mode) {
       out = rows.map(r => `[${r.querySelector('.pick-std').value}]`).join('\n');
     }
     setPath(target, out);
+    dlg.close();
+    render(); saveSoon();
+  };
+  dlg.showModal();
+}
+
+/* 수행평가 평가방법 고르기 창: 목록에서 고르고, 없는 방법은 직접 입력해 추가 */
+function openMethodPicker(i) {
+  const dlg = $('#picker'), p = state.perfs[i];
+  const chosen = splitMethods(p.method);
+  const chip = (m, on) => `<label class="chip"><input type="checkbox" class="pick-method" value="${esc(m)}"${on ? ' checked' : ''}><span>${esc(m)}</span></label>`;
+  $('#pickerTitle').textContent = '평가방법 선택';
+  $('#pickerHint').textContent = `${p.name || `수행평가 ${i + 1}`} · 여러 개를 고를 수 있습니다. 고른 방법은 채점기준표 평가방법에 자동으로 체크됩니다.`;
+  $('#pickerBody').innerHTML = `
+    <div class="chips method-list">${[...PERF_METHODS, ...chosen.filter(m => !PERF_METHODS.includes(m))].map(m => chip(m, chosen.includes(m))).join('')}</div>
+    <div class="method-add">
+      <input class="input" type="text" id="methodNew" placeholder="목록에 없는 방법 직접 입력 (예: 보고서)" aria-label="평가방법 직접 입력">
+      <button type="button" class="btn btn-secondary" id="methodAdd">추가</button>
+    </div>`;
+  $('#pickerBody').onchange = null;
+  const add = () => {
+    const box = $('#methodNew');
+    // '논술'처럼 목록 방법의 줄임말은 목록 이름으로 ('서술·논술')
+    splitMethods(box.value).map(m => PERF_METHODS.includes(rubricMethodName(m)) ? rubricMethodName(m) : m).forEach(m => {
+      const have = $$('#pickerBody .pick-method').find(x => x.value === m);
+      if (have) have.checked = true;
+      else $('#pickerBody .method-list').insertAdjacentHTML('beforeend', chip(m, true));
+    });
+    box.value = '';
+    box.focus();
+  };
+  $('#methodAdd').onclick = add;
+  $('#methodNew').onkeydown = e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); add(); } };
+  $('#pickerApply').onclick = () => {
+    if ($('#methodNew').value.trim()) add();
+    setPerfMethods(i, $$('#pickerBody .pick-method').filter(x => x.checked).map(x => x.value));
     dlg.close();
     render(); saveSoon();
   };
