@@ -1,10 +1,18 @@
 /* AI(Claude)로 수행평가 평가기준 A~E 초안 작성
- * - API 키가 있으면: 이 브라우저에서 Claude API를 바로 불러 작성 (키는 이 브라우저에만 저장)
+ * - API 키가 있으면: 이 브라우저에서 Gemini API(무료 등급 있음) 또는 Claude API를 바로 불러 작성 (키는 이 브라우저에만 저장)
  * - API 키가 없으면: 질문(프롬프트)을 복사해 Claude·ChatGPT 등 채팅에 붙여 넣고, 답을 다시 붙여 넣어 채움 */
 'use strict';
 
 const AI_MODEL = 'claude-opus-5-5';
-const AI_KEY = 'assessPlan.aiKey';
+// 항상 최신 Flash 모델을 가리키는 별칭 (무료 등급에서 쓸 수 있는 모델)
+const GEMINI_MODEL = 'gemini-flash-latest';
+const AI_PROVIDERS = {
+  gemini: { name: 'Gemini', keyName: 'Gemini API 키', ph: 'AIza…', store: 'assessPlan.geminiKey',
+    help: '키는 <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a>에서 무료로 만들 수 있습니다. 무료 등급은 하루 사용 횟수에 제한이 있고, 입력 내용이 Google 서비스 개선에 쓰일 수 있으니 학생 개인정보는 넣지 마세요.' },
+  claude: { name: 'Claude', keyName: 'Claude API 키', ph: 'sk-ant-…', store: 'assessPlan.aiKey',
+    help: '키는 <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">Claude Console</a>에서 만들 수 있으며 사용량만큼 요금이 듭니다 (한 번에 약 50~100원).' },
+};
+const AI_PROVIDER = 'assessPlan.aiProvider';
 const AI_TAB = 'assessPlan.aiTab';
 
 function aiGet(k) { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } }
@@ -82,7 +90,56 @@ const LEVELS_SCHEMA = {
   additionalProperties: false,
 };
 
-async function aiGenerate(i, apiKey, extra) {
+function aiCheckLevels(data) {
+  if (!data || !LEVELS.every(L => typeof data[L] === 'string' && data[L].trim())) throw new Error('AI 답을 읽지 못했습니다. 다시 시도해 주세요.');
+  return Object.fromEntries(LEVELS.map(L => [L, data[L].trim()]));
+}
+function aiReadJson(text) {
+  try { return JSON.parse(text); } catch (e) { return aiParseLevels(text); }
+}
+
+/* Gemini API (REST) */
+async function aiGenerateGemini(i, apiKey, extra) {
+  let res;
+  try {
+    res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: AI_SYSTEM }] },
+        contents: [{ role: 'user', parts: [{ text: aiUserText(i, extra) }] }],
+        generationConfig: {
+          responseMimeType: 'application/json',
+          responseSchema: { type: 'OBJECT', properties: Object.fromEntries(LEVELS.map(L => [L, { type: 'STRING' }])), required: [...LEVELS], propertyOrdering: [...LEVELS] },
+        },
+      }),
+    });
+  } catch (e) {
+    throw new Error('Gemini API에 연결하지 못했습니다. 인터넷 연결(학교 방화벽 포함)을 확인해 주세요.');
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const err = data.error || {}, msg = String(err.message || '');
+    if (res.status === 400 && /api key/i.test(msg)) throw new Error('API 키가 올바르지 않습니다. 키를 다시 확인해 주세요.');
+    if (res.status === 403) throw new Error('이 API 키로는 사용할 수 없습니다. Google AI Studio에서 키를 확인해 주세요.');
+    if (res.status === 429) throw new Error('무료 사용 한도에 걸렸습니다. 잠시(또는 내일) 뒤에 다시 시도하거나 [AI 채팅에 붙여 넣기]를 쓰세요.');
+    if (res.status === 404) throw new Error(`Gemini 모델(${GEMINI_MODEL})을 찾지 못했습니다. 사이트 관리자에게 알려 주세요.`);
+    throw new Error(`Gemini API 오류 (${res.status}): ${msg || res.statusText}`);
+  }
+  if (data.promptFeedback && data.promptFeedback.blockReason) throw new Error('AI가 이 요청에 답하지 않았습니다. 수행 과제·성취기준 내용을 확인한 뒤 다시 시도해 주세요.');
+  const cand = (data.candidates || [])[0] || {};
+  if (cand.finishReason === 'MAX_TOKENS') throw new Error('답이 너무 길어 중간에 끊겼습니다. 다시 시도해 주세요.');
+  if (cand.finishReason && cand.finishReason !== 'STOP') throw new Error('AI가 이 요청에 답하지 않았습니다. 다시 시도해 주세요.');
+  const text = ((cand.content || {}).parts || []).filter(x => !x.thought).map(x => x.text || '').join('');
+  return aiCheckLevels(aiReadJson(text));
+}
+
+function aiGenerate(provider, i, apiKey, extra) {
+  return provider === 'gemini' ? aiGenerateGemini(i, apiKey, extra) : aiGenerateClaude(i, apiKey, extra);
+}
+
+/* Claude API (공식 SDK) */
+async function aiGenerateClaude(i, apiKey, extra) {
   const Anthropic = await aiLoadSdk();
   const client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true, maxRetries: 2 });
   let res;
@@ -107,10 +164,7 @@ async function aiGenerate(i, apiKey, extra) {
   if (res.stop_reason === 'refusal') throw new Error('AI가 이 요청에 답하지 않았습니다. 수행 과제·성취기준 내용을 확인한 뒤 다시 시도해 주세요.');
   if (res.stop_reason === 'max_tokens') throw new Error('답이 너무 길어 중간에 끊겼습니다. 다시 시도해 주세요.');
   const text = res.content.filter(b => b.type === 'text').map(b => b.text).join('');
-  let data;
-  try { data = JSON.parse(text); } catch (e) { data = aiParseLevels(text); }
-  if (!data || !LEVELS.every(L => typeof data[L] === 'string' && data[L].trim())) throw new Error('AI 답을 읽지 못했습니다. 다시 시도해 주세요.');
-  return Object.fromEntries(LEVELS.map(L => [L, data[L].trim()]));
+  return aiCheckLevels(aiReadJson(text));
 }
 
 /* ---------- AI 작성 창 ---------- */
@@ -120,6 +174,7 @@ function openAiDialog(i) {
   if (missing.length) { alert(`AI로 작성하려면 먼저 ${missing.join('와 ')}을(를) 입력해 주세요.`); return; }
   const dlg = $('#picker'), body = $('#pickerBody'), apply = $('#pickerApply');
   let tab = aiGet(AI_TAB) === 'chat' ? 'chat' : 'api', result = null, busy = false;
+  let provider = aiGet(AI_PROVIDER) === 'claude' ? 'claude' : 'gemini';
   $('#pickerTitle').textContent = 'AI로 평가기준 작성';
   $('#pickerHint').textContent = `${p.name || `수행평가 ${i + 1}`} · 수행 과제와 성취기준(성취수준 포함)을 바탕으로 A~E 초안을 만듭니다. 넣기 전에 내용을 확인하고 고쳐 쓰세요.`;
   body.onchange = null;
@@ -133,14 +188,17 @@ function openAiDialog(i) {
     const extraBox = `<label class="field"><span class="label">추가 요청 (선택)</span><textarea class="input" id="aiExtra" rows="2" placeholder="예: 더 간결하게, 모둠 활동의 협력 과정도 드러나게">${extra}</textarea></label>`;
     if (tab === 'api') {
       body.innerHTML = tabs + `
-        <label class="field"><span class="label">Claude API 키</span><input class="input" type="password" id="aiKey" autocomplete="off" placeholder="sk-ant-…" value="${esc(aiGet(AI_KEY))}">
-          <span class="help">키는 <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">Claude Console</a>에서 만들 수 있으며 사용량만큼 요금이 듭니다. 키는 이 브라우저에만 저장되고 작성 파일(.json)이나 한글 파일에는 들어가지 않습니다. 공용 컴퓨터에서는 쓰고 나서 [키 지우기]를 누르세요. <button type="button" class="btn-link" id="aiForget">키 지우기</button></span></label>
+        <div class="field"><span class="label">사용할 AI</span><div class="segmented" role="radiogroup">
+          ${Object.entries(AI_PROVIDERS).map(([k, v]) => `<label><input type="radio" name="aiProvider" value="${k}"${provider === k ? ' checked' : ''}><span>${v.name}${k === 'gemini' ? ' (무료 등급)' : ''}</span></label>`).join('')}</div></div>
+        <label class="field"><span class="label">${AI_PROVIDERS[provider].keyName}</span><input class="input" type="password" id="aiKey" autocomplete="off" placeholder="${AI_PROVIDERS[provider].ph}" value="${esc(aiGet(AI_PROVIDERS[provider].store))}">
+          <span class="help">${AI_PROVIDERS[provider].help} 키는 이 브라우저에만 저장되고 작성 파일(.json)이나 한글 파일에는 들어가지 않습니다. 공용 컴퓨터에서는 쓰고 나서 [키 지우기]를 누르세요. <button type="button" class="btn-link" id="aiForget">키 지우기</button></span></label>
         ${extraBox}
         <div id="aiOut">${result ? preview(result) + '<button type="button" class="btn btn-secondary small" id="aiRedo">다시 작성</button>' : ''}</div>
         <p class="ai-status" id="aiStatus" role="status"></p>`;
       apply.textContent = result ? '평가기준에 넣기' : 'AI로 작성';
       if (result) $('#aiRedo').onclick = () => { result = null; apply.textContent = 'AI로 작성'; apply.click(); };
-      $('#aiForget').onclick = () => { aiSet(AI_KEY, ''); $('#aiKey').value = ''; $('#aiStatus').textContent = '이 브라우저에 저장된 키를 지웠습니다.'; };
+      body.querySelectorAll('input[name=aiProvider]').forEach(x => { x.onchange = () => { provider = x.value; aiSet(AI_PROVIDER, provider); draw(); }; });
+      $('#aiForget').onclick = () => { aiSet(AI_PROVIDERS[provider].store, ''); $('#aiKey').value = ''; $('#aiStatus').textContent = '이 브라우저에 저장된 키를 지웠습니다.'; };
     } else {
       body.innerHTML = tabs + `
         <ol class="ai-steps">
@@ -180,10 +238,10 @@ function openAiDialog(i) {
     }
     const key = $('#aiKey').value.trim();
     if (!key) { status.textContent = 'API 키를 입력해 주세요. 키가 없으면 [AI 채팅에 붙여 넣기]를 쓰세요.'; status.className = 'ai-status warn'; $('#aiKey').focus(); return; }
-    aiSet(AI_KEY, key);
-    busy = true; apply.disabled = true; status.className = 'ai-status'; status.textContent = 'AI가 평가기준을 쓰고 있습니다… (보통 20초~1분)';
+    aiSet(AI_PROVIDERS[provider].store, key);
+    busy = true; apply.disabled = true; status.className = 'ai-status'; status.textContent = `${AI_PROVIDERS[provider].name}가 평가기준을 쓰고 있습니다… (보통 10초~1분)`;
     try {
-      result = await aiGenerate(i, key, $('#aiExtra').value.trim());
+      result = await aiGenerate(provider, i, key, $('#aiExtra').value.trim());
       draw();
       $('#aiStatus').textContent = '초안이 나왔습니다. 고칠 곳을 고친 뒤 [평가기준에 넣기]를 누르세요.';
       $('#aiStatus').className = 'ai-status ok';
