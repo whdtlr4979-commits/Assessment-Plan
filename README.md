@@ -26,17 +26,11 @@
 
 ## AI로 평가기준 작성
 
-4단계(수행평가 채점기준)의 **[AI로 작성]** 은 수행 과제와 교육과정 성취기준(불러온 성취기준별 성취수준 포함)을 바탕으로 평가기준 A~E 초안을 만듭니다.
-결과는 창에서 먼저 보여 주므로 고친 뒤 넣을 수 있습니다. 두 가지 방법이 있습니다.
+4단계(수행평가 채점기준)의 **[AI로 작성]** 은 수행 과제와 교육과정 성취기준(불러온 성취기준별 성취수준 포함)을 바탕으로
+평가기준 A~E 초안을 만드는 프롬프트를 만들어 줍니다. API 키나 요금 없이 쓸 수 있습니다.
 
-- **API 키로 바로 작성**: API 키를 넣으면 사이트에서 바로 작성합니다. 두 가지 AI 중 고릅니다.
-  - **Gemini (무료 등급)**: [Google AI Studio](https://aistudio.google.com/apikey)에서 무료로 키를 만들 수 있습니다 (모델 `gemini-flash-latest`, 붐비거나 한도에 걸리면 자동으로 다시 시도한 뒤 `gemini-flash-lite-latest`로 전환). 하루 사용 횟수 제한이 있고, 무료 등급 입력 내용은 Google 서비스 개선에 쓰일 수 있으니 학생 개인정보는 넣지 마세요.
-  - **Claude**: [Claude Console](https://console.anthropic.com/settings/keys)의 API 키 (모델 `claude-opus-5-5`, 사용량만큼 요금 발생).
-
-  키는 그 브라우저에만 저장되고 작성 파일(.json)·한글 파일에는 들어가지 않습니다. 공용 컴퓨터에서는 [키 지우기]를 누르세요.
-- **AI 채팅에 붙여 넣기** (키 없이): [질문 복사] → Claude(claude.ai)·ChatGPT 등에 붙여 넣기 → 받은 답(`A: …` ~ `E: …`)을 붙여 넣으면 채워집니다.
-
-Claude SDK는 `js/vendor/anthropic-sdk.mjs` 에 들어 있습니다 (다시 만들기: `sh tools/build_anthropic_sdk.sh`).
+1. [프롬프트 복사] → Claude(claude.ai)·ChatGPT·Gemini 등 AI 채팅에 붙여 넣기
+2. 받은 답(`A: …` ~ `E: …`)을 창에 붙여 넣고 [평가기준에 넣기]
 
 ## 사용 방법
 
@@ -114,8 +108,7 @@ js/example.js              양식 〈예시〉(공통국어1) 데이터
 js/steps.js                단계별 작성 화면
 js/app.js                  입력·자동계산·저장, 양식 모양 문서(미리보기·내려받기용)
 js/hwpx.js                 한글(.hwpx) 내보내기 (외부 라이브러리 없음)
-js/ai.js                   AI(Gemini·Claude)로 평가기준 A~E 초안 작성
-js/vendor/anthropic-sdk.mjs  공식 Claude SDK (브라우저용 묶음)
+js/ai.js                   AI 채팅용 평가기준 A~E 프롬프트 만들기·답 붙여 넣기
 js/hwpx-template.js        양식 한글 파일에서 뽑은 스타일 (tools/make_hwpx_template.py 로 생성)
 data/standards/            과목별 성취기준·성취수준 데이터
 tools/pdf_to_standards.py  성취수준 PDF → 데이터 변환 도구
