@@ -26,6 +26,7 @@ const ICONS = {
   chevron: 'M6 9l6 6 6-6',
   download: 'M12 4v11M7 10l5 5 5-5M5 20h14',
   alert: 'M12 8v5M12 16.5v.5M12 3l9.5 17h-19z',
+  spark: 'M12 3.5l1.9 5.1 5.1 1.9-5.1 1.9-1.9 5.1-1.9-5.1-5.1-1.9 5.1-1.9zM18.5 15.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z',
 };
 function icon(name, cls = '') {
   return `<svg class="ic ${cls}" viewBox="0 0 24 24" aria-hidden="true"><path d="${ICONS[name]}"/></svg>`;
@@ -285,7 +286,7 @@ function stepRubric() {
       <tbody>
         <tr><th>수행 과제</th><td colspan="2">${area(`${base}.task`, { ph: '학생이 수행할 과제', rows: 2 })}</td></tr>
         <tr><th>교육과정<br>성취기준</th><td colspan="2">${area(`${base}.standards`, { rows: 2 })}${b('fillRubricStd', '평가 설계에서 고른 성취기준 넣기', { i }, 'btn-plain small')}</td></tr>
-        ${LEVELS.map((L, li) => `<tr>${li === 0 ? `<th rowspan="5">평가기준${b('fillRubricLevels', '성취수준에서 가져오기', { i }, 'btn-plain small block')}</th>` : ''}<td class="lv">${L}</td><td>${area(`${base}.levels.${L}`, { rows: 1 })}</td></tr>`).join('')}
+        ${LEVELS.map((L, li) => `<tr>${li === 0 ? `<th rowspan="5">평가기준${b('aiLevels', `${icon('spark')}AI로 작성`, { i }, 'btn-ai small block')}${b('fillRubricLevels', '성취수준에서 가져오기', { i }, 'btn-plain small block')}</th>` : ''}<td class="lv">${L}</td><td>${area(`${base}.levels.${L}`, { rows: 1 })}</td></tr>`).join('')}
         <tr><th>평가방법</th><td colspan="2">${checkChips(`${base}.methods`, [...EVAL_METHODS, ...r.methods.filter(m => !EVAL_METHODS.includes(m))])}<p class="help">평가 설계에서 고른 평가방법이 자동으로 체크됩니다.</p></td></tr>
         <tr><th>관찰·평가</th><td colspan="2">${checkChips(`${base}.observe`, OBSERVE_METHODS)}</td></tr>
         <tr><th>학생 유의사항</th><td colspan="2">${area(`${base}.notes`, { rows: 2 })}</td></tr>

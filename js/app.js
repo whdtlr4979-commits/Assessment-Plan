@@ -659,6 +659,7 @@ const actions = {
     LEVELS.forEach(L => { r.levels[L] = found.map(s => (s.levels || {})[L]).filter(Boolean).join('\n'); });
   },
   pickStd: d => { openPicker(d.target, d.mode); return false; },
+  aiLevels: d => { openAiDialog(+d.i); return false; },
   newPlan: () => {
     const sem = prompt('새 평가계획을 만듭니다. 학기를 입력하세요 (1 또는 2)\n※ 현재 내용은 지워집니다. 필요하면 먼저 [파일로 저장]하세요.', state.meta.semester || '2');
     if (sem == null) return false;

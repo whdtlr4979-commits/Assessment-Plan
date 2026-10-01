@@ -329,6 +329,21 @@ details.disclosure[open] > summary { margin-bottom: 14px; }
 /* ---------- 선택 창 ---------- */
 .sheet-dialog { width: min(760px, 94vw); max-height: 86vh; padding: 0; border: 0; border-radius: 18px; box-shadow: 0 24px 80px rgba(0, 0, 0, .28); display: none; flex-direction: column; }
 .sheet-dialog[open] { display: flex; }
+.btn.btn-ai { color: var(--accent); }
+.btn.btn-ai .ic { width: 14px; height: 14px; margin-right: 3px; }
+.btn-link { border: 0; background: none; padding: 0; color: var(--accent); font: inherit; cursor: pointer; text-decoration: underline; }
+.ai-tabs { margin: 8px 0 18px; }
+.ai-steps { margin: 0; padding-left: 20px; }
+.ai-steps li { margin-bottom: 14px; }
+.ai-steps li .btn { margin-right: 8px; }
+.ai-result { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+.ai-lv { display: flex; gap: 10px; align-items: flex-start; }
+.ai-lv .lv-badge { flex: none; width: 28px; height: 28px; border-radius: 8px; background: var(--fill); display: grid; place-items: center; font-weight: 700; margin-top: 4px; }
+.ai-lv .input { flex: 1; min-width: 0; }
+.ai-result + .btn { margin-top: 10px; }
+.ai-status { min-height: 1.4em; margin: 10px 0 0; font-size: 13.5px; color: var(--text-2); }
+.ai-status.ok { color: #1a7f37; }
+.ai-status.warn { color: #c4321f; }
 .sheet-dialog::backdrop { background: rgba(0, 0, 0, .32); backdrop-filter: blur(2px); }
 .dialog-head { padding: 22px 24px 12px; border-bottom: 1px solid var(--line); }
 .dialog-head h2 { margin: 0; font-size: 20px; letter-spacing: -0.02em; }
