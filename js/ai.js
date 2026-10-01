@@ -1,11 +1,12 @@
-/* AI(Claude)로 수행평가 평가기준 A~E 초안 작성
+/* AI(Gemini·Claude)로 수행평가 평가기준 A~E 초안 작성
  * - API 키가 있으면: 이 브라우저에서 Gemini API(무료 등급 있음) 또는 Claude API를 바로 불러 작성 (키는 이 브라우저에만 저장)
  * - API 키가 없으면: 질문(프롬프트)을 복사해 Claude·ChatGPT 등 채팅에 붙여 넣고, 답을 다시 붙여 넣어 채움 */
 'use strict';
 
 const AI_MODEL = 'claude-opus-5-5';
-// 항상 최신 Flash 모델을 가리키는 별칭 (무료 등급에서 쓸 수 있는 모델)
-const GEMINI_MODEL = 'gemini-flash-latest';
+// 항상 최신 모델을 가리키는 별칭 (무료 등급에서 쓸 수 있는 모델).
+// 앞 모델이 붐비거나(503) 한도에 걸리면(429) 다음 모델로 넘어감
+const GEMINI_MODELS = ['gemini-flash-latest', 'gemini-flash-lite-latest'];
 const AI_PROVIDERS = {
   gemini: { name: 'Gemini', keyName: 'Gemini API 키', ph: 'AIza…', store: 'assessPlan.geminiKey',
     help: '키는 <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a>에서 무료로 만들 수 있습니다. 무료 등급은 하루 사용 횟수에 제한이 있고, 입력 내용이 Google 서비스 개선에 쓰일 수 있으니 학생 개인정보는 넣지 마세요.' },
@@ -99,10 +100,11 @@ function aiReadJson(text) {
 }
 
 /* Gemini API (REST) */
-async function aiGenerateGemini(i, apiKey, extra) {
+const aiSleep = ms => new Promise(r => setTimeout(r, ms));
+async function aiGeminiOnce(model, apiKey, i, extra) {
   let res;
   try {
-    res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`, {
+    res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
       body: JSON.stringify({
@@ -115,16 +117,33 @@ async function aiGenerateGemini(i, apiKey, extra) {
       }),
     });
   } catch (e) {
-    throw new Error('Gemini API에 연결하지 못했습니다. 인터넷 연결(학교 방화벽 포함)을 확인해 주세요.');
+    return { status: 0 };
   }
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    const err = data.error || {}, msg = String(err.message || '');
-    if (res.status === 400 && /api key/i.test(msg)) throw new Error('API 키가 올바르지 않습니다. 키를 다시 확인해 주세요.');
-    if (res.status === 403) throw new Error('이 API 키로는 사용할 수 없습니다. Google AI Studio에서 키를 확인해 주세요.');
-    if (res.status === 429) throw new Error('무료 사용 한도에 걸렸습니다. 잠시(또는 내일) 뒤에 다시 시도하거나 [AI 채팅에 붙여 넣기]를 쓰세요.');
-    if (res.status === 404) throw new Error(`Gemini 모델(${GEMINI_MODEL})을 찾지 못했습니다. 사이트 관리자에게 알려 주세요.`);
-    throw new Error(`Gemini API 오류 (${res.status}): ${msg || res.statusText}`);
+  return { status: res.status, ok: res.ok, data: await res.json().catch(() => ({})) };
+}
+async function aiGenerateGemini(i, apiKey, extra, onStatus) {
+  let last = null;
+  for (const model of GEMINI_MODELS) {
+    // 서버가 붐비면(500·503) 잠시 쉬었다가 같은 모델로 두 번 더 시도
+    for (const wait of [0, 3000, 8000]) {
+      if (wait) { onStatus(`Gemini 서버가 붐벼서 ${wait / 1000}초 뒤에 다시 시도합니다…`); await aiSleep(wait); }
+      last = await aiGeminiOnce(model, apiKey, i, extra);
+      if (last.ok || ![0, 500, 503].includes(last.status)) break;
+    }
+    if (last.ok) break;
+    if (![0, 429, 500, 503, 404].includes(last.status)) break;
+    if (model !== GEMINI_MODELS[GEMINI_MODELS.length - 1]) onStatus('다른 Gemini 모델(가벼운 모델)로 다시 시도합니다…');
+  }
+  const { status, data = {} } = last;
+  if (status === 0) throw new Error('Gemini API에 연결하지 못했습니다. 인터넷 연결(학교 방화벽 포함)을 확인해 주세요.');
+  if (!last.ok) {
+    const msg = String((data.error || {}).message || '');
+    if (status === 400 && /api key/i.test(msg)) throw new Error('API 키가 올바르지 않습니다. 키를 다시 확인해 주세요.');
+    if (status === 403) throw new Error('이 API 키로는 사용할 수 없습니다. Google AI Studio에서 키를 확인해 주세요.');
+    if (status === 429) throw new Error('무료 사용 한도에 걸렸습니다. 잠시(또는 내일) 뒤에 다시 시도하거나 [AI 채팅에 붙여 넣기]를 쓰세요.');
+    if (status === 500 || status === 503) throw new Error('지금 Gemini 서버에 사용자가 몰려 응답하지 못했습니다(일시적). 1~2분 뒤 다시 시도하거나 [AI 채팅에 붙여 넣기]를 쓰세요.');
+    if (status === 404) throw new Error('Gemini 모델을 찾지 못했습니다. 사이트 관리자에게 알려 주세요.');
+    throw new Error(`Gemini API 오류 (${status}): ${msg}`);
   }
   if (data.promptFeedback && data.promptFeedback.blockReason) throw new Error('AI가 이 요청에 답하지 않았습니다. 수행 과제·성취기준 내용을 확인한 뒤 다시 시도해 주세요.');
   const cand = (data.candidates || [])[0] || {};
@@ -134,8 +153,8 @@ async function aiGenerateGemini(i, apiKey, extra) {
   return aiCheckLevels(aiReadJson(text));
 }
 
-function aiGenerate(provider, i, apiKey, extra) {
-  return provider === 'gemini' ? aiGenerateGemini(i, apiKey, extra) : aiGenerateClaude(i, apiKey, extra);
+function aiGenerate(provider, i, apiKey, extra, onStatus = () => {}) {
+  return provider === 'gemini' ? aiGenerateGemini(i, apiKey, extra, onStatus) : aiGenerateClaude(i, apiKey, extra);
 }
 
 /* Claude API (공식 SDK) */
@@ -241,7 +260,7 @@ function openAiDialog(i) {
     aiSet(AI_PROVIDERS[provider].store, key);
     busy = true; apply.disabled = true; status.className = 'ai-status'; status.textContent = `${AI_PROVIDERS[provider].name}가 평가기준을 쓰고 있습니다… (보통 10초~1분)`;
     try {
-      result = await aiGenerate(provider, i, key, $('#aiExtra').value.trim());
+      result = await aiGenerate(provider, i, key, $('#aiExtra').value.trim(), t => { status.textContent = t; });
       draw();
       $('#aiStatus').textContent = '초안이 나왔습니다. 고칠 곳을 고친 뒤 [평가기준에 넣기]를 누르세요.';
       $('#aiStatus').className = 'ai-status ok';

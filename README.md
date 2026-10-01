@@ -30,7 +30,7 @@
 결과는 창에서 먼저 보여 주므로 고친 뒤 넣을 수 있습니다. 두 가지 방법이 있습니다.
 
 - **API 키로 바로 작성**: API 키를 넣으면 사이트에서 바로 작성합니다. 두 가지 AI 중 고릅니다.
-  - **Gemini (무료 등급)**: [Google AI Studio](https://aistudio.google.com/apikey)에서 무료로 키를 만들 수 있습니다 (모델 `gemini-flash-latest`). 하루 사용 횟수 제한이 있고, 무료 등급 입력 내용은 Google 서비스 개선에 쓰일 수 있으니 학생 개인정보는 넣지 마세요.
+  - **Gemini (무료 등급)**: [Google AI Studio](https://aistudio.google.com/apikey)에서 무료로 키를 만들 수 있습니다 (모델 `gemini-flash-latest`, 붐비거나 한도에 걸리면 자동으로 다시 시도한 뒤 `gemini-flash-lite-latest`로 전환). 하루 사용 횟수 제한이 있고, 무료 등급 입력 내용은 Google 서비스 개선에 쓰일 수 있으니 학생 개인정보는 넣지 마세요.
   - **Claude**: [Claude Console](https://console.anthropic.com/settings/keys)의 API 키 (모델 `claude-opus-5-5`, 사용량만큼 요금 발생).
 
   키는 그 브라우저에만 저장되고 작성 파일(.json)·한글 파일에는 들어가지 않습니다. 공용 컴퓨터에서는 [키 지우기]를 누르세요.
